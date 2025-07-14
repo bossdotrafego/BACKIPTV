@@ -1,0 +1,17 @@
+services:
+  # Define o nosso serviço web
+  - type: web
+    name: recarga-front # Pode usar o nome que preferir
+    # Define o ambiente como PHP
+    runtime: php
+    # Define a pasta onde estão os ficheiros do site
+    rootDir: frontend
+    # Comandos para construir e iniciar o servidor
+    buildCommand: "composer install"
+    startCommand: "heroku-php-apache2"
+    # Define o plano gratuito
+    plan: free
+    # Define as variáveis de ambiente necessárias
+    envVars:
+      - key: MERCADO_PAGO_ACCESS_TOKEN
+        # O valor será adicionado manualmente no painel do Render
