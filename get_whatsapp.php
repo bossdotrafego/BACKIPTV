@@ -1,1 +1,0 @@
-<?php echo json_encode(['whatsapp' => '5511912345678']); ?>
