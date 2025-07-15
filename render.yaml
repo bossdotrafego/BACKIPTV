@@ -1,10 +1,8 @@
 services:
   - type: web
     name: recarga-front
-    runtime: php
     plan: free
-    rootDir: frontend
-    buildCommand: "composer install"
-    startCommand: "heroku-php-apache2"
-    envVars:
-      - key: MERCADO_PAGO_ACCESS_TOKEN
+    env: docker
+    # Diz ao serviço para usar o grupo de variáveis que criámos
+    envVarGroups:
+      - name: chaves-mercadopago
