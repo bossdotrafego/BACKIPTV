@@ -1,34 +1,407 @@
-
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Adicionar Códigos - Admin</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🔐 Área de Administração - UniTV</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { 
+            font-family: Arial, sans-serif; 
+            background: #111; 
+            color: #fff; 
+            padding: 20px;
+            line-height: 1.6;
+        }
+        .container { 
+            max-width: 800px; 
+            margin: 0 auto; 
+            background: #222; 
+            border-radius: 10px; 
+            padding: 30px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+        }
+        .header { 
+            text-align: center; 
+            margin-bottom: 30px; 
+            padding-bottom: 20px;
+            border-bottom: 2px solid #444;
+        }
+        .logo { margin-bottom: 15px; }
+        .logo img { width: 60px; height: auto; }
+        h1 { color: #00ff99; margin-bottom: 10px; }
+        .subtitle { color: #ccc; font-size: 1.1rem; }
+        
+        .tabs {
+            display: flex;
+            margin-bottom: 30px;
+            background: #333;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        .tab {
+            flex: 1;
+            padding: 15px;
+            text-align: center;
+            cursor: pointer;
+            border: none;
+            background: #333;
+            color: #ccc;
+            font-size: 1rem;
+            transition: all 0.3s ease;
+        }
+        .tab.active {
+            background: #00ff99;
+            color: #111;
+            font-weight: bold;
+        }
+        .tab:hover {
+            background: #444;
+        }
+        .tab.active:hover {
+            background: #00ff99;
+        }
+        
+        .tab-content {
+            display: none;
+        }
+        .tab-content.active {
+            display: block;
+        }
+        
+        /* FORMULÁRIO DE ADICIONAR */
+        .form-group {
+            margin-bottom: 20px;
+        }
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            color: #00ff99;
+            font-weight: bold;
+        }
+        .form-group input, .form-group textarea {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #444;
+            border-radius: 6px;
+            background: #333;
+            color: #fff;
+            font-size: 1rem;
+            transition: border-color 0.3s ease;
+        }
+        .form-group input:focus, .form-group textarea:focus {
+            outline: none;
+            border-color: #00ff99;
+        }
+        .form-group textarea {
+            min-height: 200px;
+            font-family: monospace;
+            resize: vertical;
+        }
+        
+        .btn {
+            padding: 12px 25px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 1rem;
+            font-weight: bold;
+            transition: all 0.3s ease;
+            margin: 5px;
+        }
+        .btn-primary {
+            background: #00ff99;
+            color: #111;
+        }
+        .btn-primary:hover {
+            background: #00cc77;
+            transform: scale(1.02);
+        }
+        .btn-secondary {
+            background: #666;
+            color: #fff;
+        }
+        .btn-secondary:hover {
+            background: #777;
+        }
+        .btn-danger {
+            background: #ff4444;
+            color: #fff;
+        }
+        .btn-danger:hover {
+            background: #cc3333;
+        }
+        
+        .resposta {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 6px;
+            display: none;
+        }
+        .resposta.sucesso {
+            background: rgba(0, 255, 153, 0.2);
+            border: 1px solid #00ff99;
+            color: #00ff99;
+        }
+        .resposta.erro {
+            background: rgba(255, 68, 68, 0.2);
+            border: 1px solid #ff4444;
+            color: #ff4444;
+        }
+        
+        /* ESTATÍSTICAS */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        .stat-card {
+            background: #333;
+            padding: 20px;
+            border-radius: 8px;
+            text-align: center;
+            border-left: 4px solid #00ff99;
+        }
+        .stat-icon {
+            font-size: 2rem;
+            margin-bottom: 10px;
+        }
+        .stat-title {
+            color: #ccc;
+            font-size: 0.9rem;
+            margin-bottom: 5px;
+        }
+        .stat-value {
+            color: #00ff99;
+            font-size: 1.8rem;
+            font-weight: bold;
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #ccc;
+        }
+        
+        /* RESPONSIVO */
+        @media (max-width: 600px) {
+            body { padding: 10px; }
+            .container { padding: 20px; }
+            .tabs { flex-direction: column; }
+            .form-group input, .form-group textarea { font-size: 16px; }
+        }
+    </style>
 </head>
-<body style="font-family: Arial; padding: 40px; background: #111; color: #fff;">
-  <h2>🔐 Área de Administração</h2>
-  <form id="adminForm">
-    <label>Senha:</label><br>
-    <input type="password" id="senha" style="padding: 10px; width: 300px;"><br><br>
-    <label>Colar novos códigos (um por linha):</label><br>
-    <textarea id="codigos" rows="10" cols="60" style="padding: 10px;"></textarea><br><br>
-    <button type="submit" style="padding: 10px 20px; background: #00ff99; border: none;">Salvar</button>
-  </form>
-  <p id="resposta" style="margin-top: 20px;"></p>
-  <script>
-    document.getElementById('adminForm').addEventListener('submit', async function(e) {
-      e.preventDefault();
-      const senha = document.getElementById('senha').value;
-      const codigos = document.getElementById('codigos').value;
-      const res = await fetch('/admin/adicionar', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ senha, codigos })
-      });
-      const data = await res.json();
-      document.getElementById('resposta').innerText = data.mensagem || data.erro;
-    });
-  </script>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="logo">
+                <img src="images/unitv.png" alt="UniTV" onerror="this.style.display='none'">
+            </div>
+            <h1>🔐 Área de Administração</h1>
+            <p class="subtitle">Controle do sistema UniTV</p>
+        </div>
+        
+        <div class="tabs">
+            <button class="tab active" onclick="abrirAba('adicionar')">➕ Adicionar Códigos</button>
+            <button class="tab" onclick="abrirAba('estatisticas')">📊 Estatísticas</button>
+        </div>
+        
+        <!-- ABA ADICIONAR CÓDIGOS -->
+        <div id="adicionar" class="tab-content active">
+            <form id="adminForm">
+                <div class="form-group">
+                    <label for="senha">🔐 Senha de Administrador:</label>
+                    <input type="password" id="senha" placeholder="Digite a senha admin" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="codigos">📝 Colar novos códigos (um por linha):</label>
+                    <textarea id="codigos" placeholder="ABC123XYZ
+DEF456UVW
+GHI789RST
+JKL012MNO" required></textarea>
+                    <small style="color: #ccc; margin-top: 5px; display: block;">
+                        💡 Cole cada código em uma linha separada<br>
+                        📋 <strong>Planos:</strong> 30 dias (R$ 24,90) | 90 dias (R$ 69,90) | 365 dias (R$ 169,90)
+                    </small>
+                </div>
+                
+                <button type="submit" class="btn btn-primary">💾 Salvar Códigos</button>
+            </form>
+            
+            <div id="resposta" class="resposta"></div>
+        </div>
+        
+        <!-- ABA ESTATÍSTICAS -->
+        <div id="estatisticas" class="tab-content">
+            <div id="loading-stats" class="loading">
+                <h3>📊 Carregando estatísticas...</h3>
+            </div>
+            
+            <div id="stats-content" style="display: none;">
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-icon">📦</div>
+                        <div class="stat-title">Códigos Disponíveis</div>
+                        <div class="stat-value" id="disponiveis">0</div>
+                    </div>
+                    
+                    <div class="stat-card">
+                        <div class="stat-icon">✅</div>
+                        <div class="stat-title">Códigos Vendidos</div>
+                        <div class="stat-value" id="vendidos">0</div>
+                    </div>
+                    
+                    <div class="stat-card">
+                        <div class="stat-icon">💰</div>
+                        <div class="stat-title">Pagamentos Aprovados</div>
+                        <div class="stat-value" id="pagamentos">0</div>
+                    </div>
+                    
+                    <div class="stat-card">
+                        <div class="stat-icon">📊</div>
+                        <div class="stat-title">Total de Códigos</div>
+                        <div class="stat-value" id="total">0</div>
+                    </div>
+                </div>
+                
+                <div style="text-align: center; margin-top: 20px;">
+                    <button class="btn btn-secondary" onclick="carregarStats()">🔄 Atualizar Dados</button>
+                    <button class="btn btn-danger" onclick="deletarCodigosTeste()">🗑️ Deletar Códigos de Teste</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // NAVEGAÇÃO ENTRE ABAS
+        function abrirAba(nomeAba) {
+            // Esconder todas as abas
+            const abas = document.querySelectorAll('.tab-content');
+            abas.forEach(aba => aba.classList.remove('active'));
+            
+            // Remover classe active dos botões
+            const botoes = document.querySelectorAll('.tab');
+            botoes.forEach(botao => botao.classList.remove('active'));
+            
+            // Mostrar aba selecionada
+            document.getElementById(nomeAba).classList.add('active');
+            event.target.classList.add('active');
+            
+            // Carregar dados específicos da aba
+            if (nomeAba === 'estatisticas') {
+                carregarStats();
+            }
+        }
+        
+        // FORMULÁRIO DE ADICIONAR CÓDIGOS (seu código original)
+        document.getElementById('adminForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const senha = document.getElementById('senha').value;
+            const codigos = document.getElementById('codigos').value;
+            const respostaDiv = document.getElementById('resposta');
+            
+            if (!senha || !codigos) {
+                mostrarResposta('❌ Preencha todos os campos!', 'erro');
+                return;
+            }
+            
+            try {
+                const response = await fetch('/admin/adicionar', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ senha, codigos })
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    mostrarResposta(`✅ ${data.mensagem}`, 'sucesso');
+                    document.getElementById('codigos').value = '';
+                    document.getElementById('senha').value = '';
+                    
+                    // Atualizar estatísticas se estiver na aba
+                    if (document.getElementById('estatisticas').classList.contains('active')) {
+                        carregarStats();
+                    }
+                } else {
+                    mostrarResposta(`❌ ${data.erro}`, 'erro');
+                }
+            } catch (error) {
+                mostrarResposta('❌ Erro de conexão com o servidor', 'erro');
+                console.error('Erro:', error);
+            }
+        });
+        
+        function mostrarResposta(mensagem, tipo) {
+            const respostaDiv = document.getElementById('resposta');
+            respostaDiv.textContent = mensagem;
+            respostaDiv.className = `resposta ${tipo}`;
+            respostaDiv.style.display = 'block';
+            
+            // Esconder após 5 segundos
+            setTimeout(() => {
+                respostaDiv.style.display = 'none';
+            }, 5000);
+        }
+        
+        // CARREGAR ESTATÍSTICAS
+        async function carregarStats() {
+            try {
+                document.getElementById('loading-stats').style.display = 'block';
+                document.getElementById('stats-content').style.display = 'none';
+                
+                const response = await fetch('/admin/status');
+                const data = await response.json();
+                
+                let disponiveis = 0, vendidos = 0, total = 0;
+                
+                if (data.codigos && Array.isArray(data.codigos)) {
+                    data.codigos.forEach(item => {
+                        const quantidade = parseInt(item.quantidade) || 0;
+                        total += quantidade;
+                        
+                        if (item.status === 'disponivel') {
+                            disponiveis = quantidade;
+                        } else if (item.status === 'vendido') {
+                            vendidos = quantidade;
+                        }
+                    });
+                }
+                
+                document.getElementById('disponiveis').textContent = disponiveis;
+                document.getElementById('vendidos').textContent = vendidos;
+                document.getElementById('total').textContent = total;
+                document.getElementById('pagamentos').textContent = data.pagamentos_aprovados || 0;
+                
+                document.getElementById('loading-stats').style.display = 'none';
+                document.getElementById('stats-content').style.display = 'block';
+                
+            } catch (error) {
+                console.error('Erro ao carregar stats:', error);
+                document.getElementById('loading-stats').innerHTML = '<h3>❌ Erro ao carregar dados</h3>';
+            }
+        }
+        
+        // DELETAR CÓDIGOS DE TESTE
+        async function deletarCodigosTeste() {
+            if (!confirm('⚠️ Tem certeza que deseja deletar os códigos de teste (ABC123XYZ, DEF456UVW, GHI789RST, JKL012MNO)?')) {
+                return;
+            }
+            
+            alert('🔧 Para deletar códigos de teste agora, acesse o banco Neon e execute:\n\nDELETE FROM "Codigos" WHERE codigo IN (\'ABC123XYZ\', \'DEF456UVW\', \'GHI789RST\', \'JKL012MNO\');\n\nEm breve, criaremos uma função automática para isso.');
+        }
+        
+        // Carregar estatísticas quando necessário
+        document.addEventListener('DOMContentLoaded', function() {
+            // Se começar na aba de estatísticas, carrega os dados
+            if (document.getElementById('estatisticas').classList.contains('active')) {
+                carregarStats();
+            }
+        });
+    </script>
 </body>
 </html>
