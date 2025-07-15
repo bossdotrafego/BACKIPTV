@@ -19,6 +19,7 @@ const sequelize = new Sequelize(process.env.DB_NAME, process.env.DB_USER, proces
 });
 
 // --- MODELOS DO BANCO ---
+// Tabela de códigos (já existe)
 const Codigo = sequelize.define('Codigo', {
   codigo: {
     type: DataTypes.STRING,
@@ -27,7 +28,7 @@ const Codigo = sequelize.define('Codigo', {
   },
   status: {
     type: DataTypes.STRING,
-    defaultValue: 'disponivel' // disponivel, vendido
+    defaultValue: 'disponivel'
   },
   id_pagamento_mp: {
     type: DataTypes.STRING,
@@ -35,6 +36,7 @@ const Codigo = sequelize.define('Codigo', {
   }
 }, {});
 
+// Nova tabela para controlar pagamentos
 const Pagamento = sequelize.define('Pagamento', {
   id_pagamento_mp: {
     type: DataTypes.STRING,
@@ -71,13 +73,13 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// --- CONFIGURAÇÃO DO MERCADO PAGO ---
-const client = new MercadoPagoConfig({ accessToken: process.env.MERCADO_PAGO_TOKEN });
-
 // --- SERVIR ARQUIVOS ESTÁTICOS ---
 app.use(express.static('.'));
 
-// --- ROTA: GERAR PAGAMENTO ---
+// --- CONFIGURAÇÃO DO MERCADO PAGO ---
+const client = new MercadoPagoConfig({ accessToken: process.env.MERCADO_PAGO_TOKEN });
+
+// --- ROTA: GERAR PAGAMENTO (sua rota original + salvar no banco) ---
 app.post('/api/gerar-pagamento', async (req, res) => {
     try {
         const { nome, email, plano, valor } = req.body;
@@ -90,16 +92,13 @@ app.post('/api/gerar-pagamento', async (req, res) => {
             transaction_amount: Number(valor),
             description: `Recarga UniTV - ${plano}`,
             payment_method_id: 'pix',
-            payer: { 
-                email: email, 
-                first_name: nome 
-            },
+            payer: { email: email, first_name: nome },
             notification_url: `${process.env.WEBHOOK_URL || 'https://unitv.onrender.com'}/webhook`,
         };
 
         const result = await payment.create({ body });
 
-        // Salvar no banco
+        // Salvar pagamento no banco
         await Pagamento.create({
             id_pagamento_mp: result.id.toString(),
             nome,
@@ -121,7 +120,7 @@ app.post('/api/gerar-pagamento', async (req, res) => {
     }
 });
 
-// --- WEBHOOK DO MERCADO PAGO ---
+// --- WEBHOOK DO MERCADO PAGO (NOVO) ---
 app.post('/webhook', async (req, res) => {
     try {
         console.log('📩 Webhook recebido:', req.body);
@@ -177,7 +176,7 @@ app.post('/webhook', async (req, res) => {
     }
 });
 
-// --- VERIFICAR STATUS DO PAGAMENTO ---
+// --- VERIFICAR STATUS DO PAGAMENTO (NOVO) ---
 app.post('/api/verificar-pagamento', async (req, res) => {
     try {
         const { id_pagamento } = req.body;
@@ -211,11 +210,12 @@ app.post('/api/verificar-pagamento', async (req, res) => {
     }
 });
 
-// --- ADMIN: ADICIONAR CÓDIGOS ---
+// --- ADMIN: PÁGINA PRINCIPAL (sua rota original) ---
 app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'admin_adicionar.html'));
 });
 
+// --- ADMIN: ADICIONAR CÓDIGOS (sua rota original) ---
 app.post('/admin/adicionar', async (req, res) => {
     const { senha, codigos } = req.body;
     if (senha !== process.env.SENHA_ADMIN) {
@@ -232,7 +232,7 @@ app.post('/admin/adicionar', async (req, res) => {
     }
 });
 
-// --- ADMIN: STATUS DOS CÓDIGOS ---
+// --- ADMIN: STATUS DOS CÓDIGOS (NOVO - OPCIONAL) ---
 app.get('/admin/status', async (req, res) => {
     try {
         const stats = await sequelize.query(`
@@ -257,7 +257,7 @@ app.get('/admin/status', async (req, res) => {
     }
 });
 
-// --- INICIAR SERVIDOR ---
+// --- INICIAR SERVIDOR (seu código original) ---
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, async () => {
     console.log(`🚀 Servidor rodando na porta ${PORT}`);
