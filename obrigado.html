@@ -375,7 +375,7 @@
         
         async function verificarPagamento() {
             try {
-                const response = await fetch('/api/verificar-pagamento', {
+                const response = await fetch('https://unitv.onrender.com/api/verificar-pagamento', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
