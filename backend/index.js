@@ -215,6 +215,11 @@ app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'admin_adicionar.html'));
 });
 
+// --- PÁGINA DE OBRIGADO ---
+app.get('/obrigado.html', (req, res) => {
+    res.sendFile(path.join(__dirname, '..', 'obrigado.html'));
+});
+
 // --- ADMIN: ADICIONAR CÓDIGOS (sua rota original) ---
 app.post('/admin/adicionar', async (req, res) => {
     const { senha, codigos } = req.body;
