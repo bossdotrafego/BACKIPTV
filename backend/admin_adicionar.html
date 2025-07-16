@@ -131,6 +131,14 @@
         .btn-danger:hover {
             background: #cc3333;
         }
+        /* --- NOVO ESTILO ADICIONADO --- */
+        .btn-warning {
+            background: #ffc107; /* Amarelo Laranja */
+            color: #111;
+        }
+        .btn-warning:hover {
+            background: #e0a800; /* Laranja mais escuro */
+        }
         
         .resposta {
             margin-top: 20px;
@@ -208,7 +216,6 @@
             <button class="tab" onclick="abrirAba('estatisticas')">📊 Estatísticas</button>
         </div>
         
-        <!-- ABA ADICIONAR CÓDIGOS -->
         <div id="adicionar" class="tab-content active">
             <form id="adminForm">
                 <div class="form-group">
@@ -234,7 +241,6 @@ JKL012MNO" required></textarea>
             <div id="resposta" class="resposta"></div>
         </div>
         
-        <!-- ABA ESTATÍSTICAS -->
         <div id="estatisticas" class="tab-content">
             <div id="loading-stats" class="loading">
                 <h3>📊 Carregando estatísticas...</h3>
@@ -270,6 +276,7 @@ JKL012MNO" required></textarea>
                 <div style="text-align: center; margin-top: 20px;">
                     <button class="btn btn-secondary" onclick="carregarStats()">🔄 Atualizar Dados</button>
                     <button class="btn btn-danger" onclick="deletarCodigosTeste()">🗑️ Deletar Códigos de Teste</button>
+                    <button class="btn btn-warning" onclick="resetarCodigosVendidos()">♻️ Resetar Códigos Vendidos</button>
                 </div>
             </div>
         </div>
@@ -393,6 +400,27 @@ JKL012MNO" required></textarea>
             }
             
             alert('🔧 Para deletar códigos de teste agora, acesse o banco Neon e execute:\n\nDELETE FROM "Codigos" WHERE codigo IN (\'ABC123XYZ\', \'DEF456UVW\', \'GHI789RST\', \'JKL012MNO\');\n\nEm breve, criaremos uma função automática para isso.');
+        }
+
+        // --- NOVA FUNÇÃO ADICIONADA ---
+        async function resetarCodigosVendidos() {
+            // 1. Exibe a confirmação
+            if (confirm('⚠️ Tem certeza que deseja resetar todos os códigos vendidos e pagamentos?')) {
+                try {
+                    // 2. Faz o fetch para a rota do backend
+                    const response = await fetch('/resetar-codigos'); // GET é o método padrão
+                    const mensagem = await response.text();
+                    
+                    alert(mensagem); // Exibe o retorno do backend
+
+                    // 3. Atualiza as estatísticas na tela
+                    carregarStats();
+
+                } catch (error) {
+                    console.error('Erro ao resetar códigos:', error);
+                    alert('❌ Erro de conexão ao tentar resetar os dados.');
+                }
+            }
         }
         
         // Carregar estatísticas quando necessário
