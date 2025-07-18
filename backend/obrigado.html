@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
@@ -440,4 +441,448 @@
         }
     </script>
 </body>
+=======
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🎉 Pagamento Aprovado - UniTV</title>
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Montserrat', Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        
+        .container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            padding: 40px;
+            max-width: 600px;
+            width: 100%;
+            text-align: center;
+            animation: slideUp 0.8s ease-out;
+        }
+        
+        @keyframes slideUp {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        
+        .loading {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 20px;
+        }
+        
+        .spinner {
+            width: 50px;
+            height: 50px;
+            border: 5px solid #f3f3f3;
+            border-top: 5px solid #28a745;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .success-icon {
+            width: 80px;
+            height: 80px;
+            background: #28a745;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 20px;
+            animation: bounce 0.6s ease-out;
+        }
+        
+        @keyframes bounce {
+            0%, 20%, 53%, 80%, 100% {
+                animation-timing-function: cubic-bezier(0.215, 0.610, 0.355, 1.000);
+                transform: translate3d(0,0,0);
+            }
+            40%, 43% {
+                animation-timing-function: cubic-bezier(0.755, 0.050, 0.855, 0.060);
+                transform: translate3d(0, -30px, 0);
+            }
+            70% {
+                animation-timing-function: cubic-bezier(0.755, 0.050, 0.855, 0.060);
+                transform: translate3d(0, -15px, 0);
+            }
+            90% {
+                transform: translate3d(0,-4px,0);
+            }
+        }
+        
+        .success-icon::before {
+            content: '✓';
+            color: white;
+            font-size: 40px;
+            font-weight: bold;
+        }
+        
+        h1 {
+            color: #333;
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+            font-weight: 700;
+        }
+        
+        .subtitle {
+            color: #666;
+            font-size: 1.2rem;
+            margin-bottom: 30px;
+        }
+        
+        .codigo-container {
+            background: #f8f9fa;
+            border: 3px dashed #28a745;
+            border-radius: 15px;
+            padding: 30px;
+            margin: 30px 0;
+            position: relative;
+        }
+        
+        .codigo-label {
+            background: white;
+            color: #28a745;
+            font-weight: 600;
+            padding: 5px 15px;
+            border-radius: 20px;
+            position: absolute;
+            top: -12px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 0.9rem;
+        }
+        
+        .codigo-texto {
+            font-family: 'Courier New', monospace;
+            font-size: 1.8rem;
+            font-weight: bold;
+            color: #333;
+            letter-spacing: 2px;
+            margin: 10px 0;
+            word-break: break-all;
+        }
+        
+        .copy-btn {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 8px 20px;
+            border-radius: 20px;
+            font-size: 0.9rem;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        
+        .copy-btn:hover {
+            background: #0056b3;
+            transform: scale(1.05);
+        }
+        
+        .instrucoes {
+            background: #e8f4fd;
+            border-left: 4px solid #007bff;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 30px 0;
+            text-align: left;
+        }
+        
+        .instrucoes h3 {
+            color: #007bff;
+            margin-bottom: 15px;
+            font-size: 1.3rem;
+        }
+        
+        .instrucoes ol {
+            color: #555;
+            line-height: 1.6;
+            padding-left: 20px;
+        }
+        
+        .instrucoes li {
+            margin-bottom: 8px;
+        }
+        
+        .botoes {
+            display: flex;
+            gap: 15px;
+            justify-content: center;
+            flex-wrap: wrap;
+            margin-top: 30px;
+        }
+        
+        .btn {
+            padding: 15px 30px;
+            border: none;
+            border-radius: 50px;
+            font-size: 1.1rem;
+            font-weight: 600;
+            text-decoration: none;
+            transition: all 0.3s;
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            min-width: 200px;
+            justify-content: center;
+        }
+        
+        .btn-whatsapp {
+            background: #25D366;
+            color: white;
+        }
+        
+        .btn-whatsapp:hover {
+            background: #20ba5a;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(37, 211, 102, 0.4);
+        }
+        
+        .btn-voltar {
+            background: #6c757d;
+            color: white;
+        }
+        
+        .btn-voltar:hover {
+            background: #545b62;
+            transform: translateY(-2px);
+        }
+        
+        .plano-info {
+            background: linear-gradient(45deg, #4c60c0, #e5343d);
+            color: white;
+            padding: 20px;
+            border-radius: 15px;
+            margin: 20px 0;
+        }
+        
+        .hidden {
+            display: none;
+        }
+        
+        @media (max-width: 600px) {
+            .container {
+                padding: 30px 20px;
+            }
+            
+            h1 {
+                font-size: 2rem;
+            }
+            
+            .codigo-texto {
+                font-size: 1.4rem;
+                letter-spacing: 1px;
+            }
+            
+            .botoes {
+                flex-direction: column;
+                align-items: center;
+            }
+            
+            .btn {
+                width: 100%;
+                max-width: 300px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Estado de carregamento -->
+        <div id="loading" class="loading">
+            <div class="spinner"></div>
+            <h2>Verificando seu pagamento...</h2>
+            <p>Aguarde um momento, estamos confirmando sua compra.</p>
+        </div>
+        
+        <!-- Estado de sucesso -->
+        <div id="success" class="hidden">
+            <div class="success-icon"></div>
+            <h1>🎉 INCRÍVEL!</h1>
+            <p class="subtitle">Seu pagamento foi aprovado e seu código UniTV está prontinho!</p>
+            
+            <div style="background: linear-gradient(45deg, #28a745, #20c997); color: white; padding: 20px; border-radius: 15px; margin: 20px 0;">
+                <h2 style="margin: 0 0 10px 0;">🚀 BEM-VINDO À FAMÍLIA UNITV!</h2>
+                <p style="margin: 0; font-size: 1.1rem;">Você agora faz parte de mais de <strong>50.000 clientes satisfeitos</strong> que escolheram a melhor experiência de streaming do Brasil!</p>
+            </div>
+            
+            <div class="plano-info">
+                <h3 id="plano-nome">🎯 Plano Ativado</h3>
+                <p>🙌 Olá, <strong id="cliente-nome">Cliente</strong>! Obrigado por confiar na UniTV!</p>
+                <p style="margin-top: 10px; font-size: 0.95rem;">💎 Você tem acesso ao nosso <strong>SUPORTE VIP VITALÍCIO</strong> - equipe exclusiva sempre disponível!</p>
+            </div>
+            
+            <div class="codigo-container">
+                <div class="codigo-label">🔑 SEU CÓDIGO UNITV EXCLUSIVO</div>
+                <div class="codigo-texto" id="codigo-unitv">CARREGANDO...</div>
+                <button class="copy-btn" onclick="copiarCodigo()">📋 Copiar Código</button>
+                <p style="margin-top: 15px; color: #666; font-size: 0.9rem;">
+                    ⚡ <strong>Ativação instantânea!</strong> Use este código agora mesmo no seu app UniTV
+                </p>
+            </div>
+            
+            <div class="instrucoes">
+                <h3>📱 Como ativar seu código em 30 segundos:</h3>
+                <ol>
+                    <li>📲 Abra o app <strong>UniTV</strong> no seu dispositivo</li>
+                    <li>👤 Vá em <strong>Perfil</strong> no menu principal</li>
+                    <li>🎁 Toque em <strong>Centro de Resgate</strong></li>
+                    <li>📝 Cole o código acima e confirme</li>
+                    <li>🎉 <strong>PRONTO!</strong> Seu plano foi ativado e você já pode assistir!</li>
+                </ol>
+                <div style="background: #fff3cd; border: 1px solid #ffeaa7; padding: 15px; border-radius: 8px; margin-top: 15px;">
+                    <p style="margin: 0; color: #856404; font-weight: 600;">
+                        💡 <strong>DICA ESPECIAL:</strong> Salve este código em local seguro! Ele é seu comprovante de compra e pode ser usado para suporte.
+                    </p>
+                </div>
+            </div>
+            
+            <div class="botoes">
+                <a href="https://wa.me/554591567288?text=Olá%21+Acabei+de+comprar+meu+plano+UniTV+e+gostaria+de+falar+com+o+SUPORTE+VIP+VITALÍCIO%21+Meu+código%3A+" 
+                   class="btn btn-whatsapp" 
+                   target="_blank"
+                   id="btn-suporte">
+                    💎 SUPORTE VIP VITALÍCIO
+                </a>
+                <a href="https://codigounitvexpress.com/" class="btn btn-voltar">
+                    🏠 Voltar ao Site
+                </a>
+            </div>
+            
+            <div style="margin-top: 30px; padding: 20px; background: #f8f9fa; border-radius: 15px; text-align: left;">
+                <h4 style="color: #28a745; margin-bottom: 15px;">🌟 O que você ganhou hoje:</h4>
+                <ul style="color: #555; line-height: 1.8; padding-left: 20px;">
+                    <li>✅ <strong>Acesso ilimitado</strong> aos melhores canais e conteúdos</li>
+                    <li>✅ <strong>Qualidade HD/4K</strong> em todos os dispositivos</li>
+                    <li>✅ <strong>Suporte VIP vitalício</strong> - equipe exclusiva 24/7</li>
+                    <li>✅ <strong>Atualizações gratuitas</strong> do app e catálogo</li>
+                    <li>✅ <strong>Garantia de satisfação</strong> - se não gostar, devolvemos!</li>
+                </ul>
+            </div>
+        </div>
+        
+        <!-- Estado de erro -->
+        <div id="error" class="hidden">
+            <h1>❌ Ops!</h1>
+            <p class="subtitle">Não conseguimos confirmar seu pagamento ainda.</p>
+            <p>Seu pagamento pode estar sendo processado. Tente novamente em alguns minutos.</p>
+            <div class="botoes">
+                <button class="btn btn-whatsapp" onclick="verificarNovamente()">
+                    🔄 Verificar Novamente
+                </button>
+                <a href="https://wa.me/554591567288?text=Olá%21+Preciso+de+ajuda+com+meu+pagamento+UniTV+-+ID%3A+" 
+                   class="btn btn-voltar" 
+                   target="_blank">
+                    💬 Falar com Suporte
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const urlParams = new URLSearchParams(window.location.search);
+        const idPagamento = urlParams.get('id');
+        
+        if (!idPagamento) {
+            mostrarErro();
+        } else {
+            verificarPagamento();
+        }
+        
+        async function verificarPagamento() {
+            try {
+                const response = await fetch('/api/verificar-pagamento', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ id_pagamento: idPagamento })
+                });
+                
+                const data = await response.json();
+                
+                if (data.sucesso && data.status === 'approved' && data.codigo) {
+                    mostrarSucesso(data);
+                } else if (data.status === 'pending') {
+                    // Tentar novamente em 3 segundos
+                    setTimeout(verificarPagamento, 3000);
+                } else {
+                    mostrarErro();
+                }
+            } catch (error) {
+                console.error('Erro:', error);
+                mostrarErro();
+            }
+        }
+        
+        function mostrarSucesso(data) {
+            document.getElementById('loading').classList.add('hidden');
+            document.getElementById('success').classList.remove('hidden');
+            
+            document.getElementById('codigo-unitv').textContent = data.codigo;
+            document.getElementById('cliente-nome').textContent = data.nome;
+            document.getElementById('plano-nome').textContent = data.plano;
+            
+            // Atualizar link do WhatsApp com o código
+            const btnSuporte = document.getElementById('btn-suporte');
+            const linkOriginal = btnSuporte.href;
+            btnSuporte.href = linkOriginal + encodeURIComponent(data.codigo);
+        }
+        
+        function mostrarErro() {
+            document.getElementById('loading').classList.add('hidden');
+            document.getElementById('error').classList.remove('hidden');
+        }
+        
+        function verificarNovamente() {
+            document.getElementById('error').classList.add('hidden');
+            document.getElementById('loading').classList.remove('hidden');
+            verificarPagamento();
+        }
+        
+        function copiarCodigo() {
+            const codigo = document.getElementById('codigo-unitv').textContent;
+            navigator.clipboard.writeText(codigo).then(() => {
+                const btn = document.querySelector('.copy-btn');
+                const textoOriginal = btn.innerHTML;
+                btn.innerHTML = '✅ Copiado!';
+                btn.style.background = '#28a745';
+                
+                setTimeout(() => {
+                    btn.innerHTML = textoOriginal;
+                    btn.style.background = '#007bff';
+                }, 2000);
+            });
+        }
+    </script>
+</body>
+>>>>>>> 983df30f442e027d4614bfecdfefe17e8e03fe0e
 </html>

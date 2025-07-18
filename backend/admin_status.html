@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
@@ -212,4 +213,220 @@
     }
   </script>
 </body>
+=======
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>📊 Status dos Códigos - Admin</title>
+  <style>
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: #1a1a2e;
+      color: #fff;
+      margin: 0;
+      padding: 20px;
+    }
+    .container {
+      max-width: 1000px;
+      margin: 0 auto;
+    }
+    h1 {
+      text-align: center;
+      color: #00ff99;
+      margin-bottom: 30px;
+    }
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+      gap: 20px;
+      margin-bottom: 30px;
+    }
+    .stat-card {
+      background: #16213e;
+      border-radius: 10px;
+      padding: 20px;
+      text-align: center;
+      border: 2px solid #0f4c75;
+    }
+    .stat-number {
+      font-size: 2.5rem;
+      font-weight: bold;
+      margin-bottom: 10px;
+    }
+    .stat-label {
+      font-size: 1.1rem;
+      opacity: 0.8;
+    }
+    .disponivel { color: #00ff99; }
+    .vendido { color: #ff6b6b; }
+    .total { color: #ffd700; }
+    .refresh-btn {
+      background: #00ff99;
+      color: #000;
+      border: none;
+      padding: 12px 24px;
+      border-radius: 6px;
+      font-size: 1rem;
+      font-weight: bold;
+      cursor: pointer;
+      margin-bottom: 20px;
+    }
+    .refresh-btn:hover {
+      background: #00cc77;
+    }
+    .loading {
+      text-align: center;
+      color: #00ff99;
+      font-size: 1.2rem;
+    }
+    .error {
+      background: #ff4757;
+      color: white;
+      padding: 15px;
+      border-radius: 8px;
+      margin: 20px 0;
+      text-align: center;
+    }
+    .last-update {
+      text-align: center;
+      opacity: 0.6;
+      margin-top: 20px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>📊 Painel de Controle - UniTV</h1>
+    
+    <button class="refresh-btn" onclick="carregarStatus()">🔄 Atualizar Dados</button>
+    
+    <div id="loading" class="loading">
+      Carregando dados...
+    </div>
+    
+    <div id="error" class="error" style="display: none;">
+      Erro ao carregar dados. Verifique se o servidor está rodando.
+    </div>
+    
+    <div id="stats" class="stats-grid" style="display: none;">
+      <!-- Os cards serão inseridos aqui via JavaScript -->
+    </div>
+    
+    <div id="last-update" class="last-update"></div>
+  </div>
+
+  <script>
+    // Carregar dados automaticamente ao abrir a página
+    document.addEventListener('DOMContentLoaded', carregarStatus);
+    
+    // Atualizar automaticamente a cada 30 segundos
+    setInterval(carregarStatus, 30000);
+    
+    async function carregarStatus() {
+      const loadingEl = document.getElementById('loading');
+      const errorEl = document.getElementById('error');
+      const statsEl = document.getElementById('stats');
+      const lastUpdateEl = document.getElementById('last-update');
+      
+      // Mostrar loading
+      loadingEl.style.display = 'block';
+      errorEl.style.display = 'none';
+      statsEl.style.display = 'none';
+      
+      try {
+        const response = await fetch('/admin/status');
+        const data = await response.json();
+        
+        if (response.ok) {
+          mostrarEstatisticas(data);
+          loadingEl.style.display = 'none';
+          statsEl.style.display = 'grid';
+          lastUpdateEl.textContent = `Última atualização: ${new Date().toLocaleString('pt-BR')}`;
+        } else {
+          throw new Error(data.erro || 'Erro desconhecido');
+        }
+      } catch (error) {
+        console.error('Erro ao carregar status:', error);
+        loadingEl.style.display = 'none';
+        errorEl.style.display = 'block';
+        errorEl.textContent = `Erro: ${error.message}`;
+      }
+    }
+    
+    function mostrarEstatisticas(data) {
+      const statsEl = document.getElementById('stats');
+      
+      // Calcular totais
+      let totalDisponiveis = 0;
+      let totalVendidos = 0;
+      
+      data.codigos.forEach(item => {
+        if (item.status === 'disponivel') {
+          totalDisponiveis = parseInt(item.quantidade);
+        } else if (item.status === 'vendido') {
+          totalVendidos = parseInt(item.quantidade);
+        }
+      });
+      
+      const totalCodigos = totalDisponiveis + totalVendidos;
+      const percentualVendido = totalCodigos > 0 ? ((totalVendidos / totalCodigos) * 100).toFixed(1) : 0;
+      
+      statsEl.innerHTML = `
+        <div class="stat-card">
+          <div class="stat-number disponivel">${totalDisponiveis}</div>
+          <div class="stat-label">Códigos Disponíveis</div>
+        </div>
+        
+        <div class="stat-card">
+          <div class="stat-number vendido">${totalVendidos}</div>
+          <div class="stat-label">Códigos Vendidos</div>
+        </div>
+        
+        <div class="stat-card">
+          <div class="stat-number total">${totalCodigos}</div>
+          <div class="stat-label">Total de Códigos</div>
+        </div>
+        
+        <div class="stat-card">
+          <div class="stat-number total">${data.pagamentos_aprovados}</div>
+          <div class="stat-label">Pagamentos Aprovados</div>
+        </div>
+        
+        <div class="stat-card">
+          <div class="stat-number total">${percentualVendido}%</div>
+          <div class="stat-label">Taxa de Conversão</div>
+        </div>
+        
+        <div class="stat-card">
+          <div class="stat-number ${totalDisponiveis < 10 ? 'vendido' : 'disponivel'}">
+            ${totalDisponiveis < 10 ? '⚠️ BAIXO' : '✅ OK'}
+          </div>
+          <div class="stat-label">Status do Estoque</div>
+        </div>
+      `;
+      
+      // Alerta se estoque baixo
+      if (totalDisponiveis < 10) {
+        if (!document.getElementById('alerta-estoque')) {
+          const alerta = document.createElement('div');
+          alerta.id = 'alerta-estoque';
+          alerta.className = 'error';
+          alerta.innerHTML = `
+            <strong>⚠️ ATENÇÃO:</strong> Estoque baixo! Apenas ${totalDisponiveis} códigos restantes.
+            <br>Adicione mais códigos urgentemente!
+          `;
+          statsEl.parentNode.insertBefore(alerta, statsEl);
+        }
+      } else {
+        const alertaExistente = document.getElementById('alerta-estoque');
+        if (alertaExistente) {
+          alertaExistente.remove();
+        }
+      }
+    }
+  </script>
+</body>
+>>>>>>> 983df30f442e027d4614bfecdfefe17e8e03fe0e
 </html>
