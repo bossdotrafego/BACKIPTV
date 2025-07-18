@@ -3,6 +3,6 @@ services:
     name: recarga-front
     plan: free
     env: docker
-    # Diz ao serviço para usar o grupo de variáveis que criámos
-    envVarGroups:
-      - name: chaves-mercadopago
+    envVars:
+      - key: MERCADO_PAGO_ACCESS_TOKEN
+        value: APP_USR-2872879530029605-071212-7a2b0edf82f7fdfed99973e6d044681d-288062953 # <-- TROQUE ISTO PELA SUA CHAVE REAL
