@@ -2,7 +2,7 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
-const { MercadoPagoConfig, Payment } = require('mercadopago');
+const axios = require('axios');
 const { Sequelize, DataTypes } = require('sequelize');
 
 // --- CONFIGURAÇÃO DO BANCO DE DADOS ---
@@ -29,14 +29,19 @@ const Codigo = sequelize.define('Codigo', {
         type: DataTypes.STRING,
         defaultValue: 'disponivel' // disponivel, vendido
     },
-    id_pagamento_mp: {
+    transaction_id: {
         type: DataTypes.STRING,
         allowNull: true
     }
 }, {});
 
 const Pagamento = sequelize.define('Pagamento', {
-    id_pagamento_mp: {
+    transaction_id: {
+        type: DataTypes.STRING,
+        allowNull: false,
+        unique: true
+    },
+    external_id: {
         type: DataTypes.STRING,
         allowNull: false,
         unique: true
@@ -56,8 +61,17 @@ app.use(express.json());
 // --- SERVIR ARQUIVOS ESTÁTICOS ---
 app.use(express.static('.'));
 
-// --- CONFIGURAÇÃO DO MERCADO PAGO ---
-const client = new MercadoPagoConfig({ accessToken: process.env.MERCADO_PAGO_TOKEN });
+// --- CONFIGURAÇÃO DA BUCKPAY ---
+const BUCKPAY_API_BASE = 'https://api.realtechdev.com.br';
+const BUCKPAY_SECRET_TOKEN = process.env.BUCKPAY_SECRET_TOKEN || 'sk_live_a74d213bb8682959c3449ee40c192791';
+
+const buckpayClient = axios.create({
+    baseURL: BUCKPAY_API_BASE,
+    headers: {
+        'Authorization': `Bearer ${BUCKPAY_SECRET_TOKEN}`,
+        'Content-Type': 'application/json'
+    }
+});
 
 // ===================================================================
 //                    ROTA DE PING PARA UPTIME MONITORING
@@ -67,11 +81,12 @@ const client = new MercadoPagoConfig({ accessToken: process.env.MERCADO_PAGO_TOK
 app.get('/ping', (req, res) => {
     res.status(200).json({ 
         status: 'online',
-        service: 'UniTV Backend',
+        service: 'UniTV Backend - BuckPay',
         timestamp: new Date().toISOString(),
         uptime: process.uptime(),
         memory: process.memoryUsage(),
-        version: '1.0.0'
+        version: '2.0.0',
+        payment_provider: 'BuckPay'
     });
 });
 
@@ -88,7 +103,8 @@ app.get('/health', async (req, res) => {
             status: 'healthy',
             database: 'connected',
             codigosDisponiveis,
-            timestamp: new Date().toISOString()
+            timestamp: new Date().toISOString(),
+            payment_provider: 'BuckPay'
         });
     } catch (error) {
         res.status(503).json({
@@ -104,6 +120,13 @@ app.get('/health', async (req, res) => {
 //                    ROTAS DE PAGAMENTO
 // ===================================================================
 
+// --- FUNÇÃO AUXILIAR: GERAR EXTERNAL_ID ÚNICO ---
+function gerarExternalId() {
+    const timestamp = Date.now();
+    const random = Math.random().toString(36).substring(2, 8);
+    return `unitv_${timestamp}_${random}`;
+}
+
 // --- ROTA: GERAR PAGAMENTO ---
 app.post('/api/gerar-pagamento', async (req, res) => {
     try {
@@ -112,28 +135,43 @@ app.post('/api/gerar-pagamento', async (req, res) => {
             return res.status(400).json({ erro: "Dados incompletos." });
         }
 
-        const payment = new Payment(client);
-        const body = {
-            transaction_amount: Number(valor),
-            description: `Recarga UniTV - ${plano}`,
-            payment_method_id: 'pix',
-            payer: { email: email, first_name: nome },
-            // WEBHOOK CORRIGIDO - SEMPRE FIXO PARA EVITAR PROBLEMAS
-            notification_url: 'https://unitv.onrender.com/webhook',
+        // Gerar external_id único
+        const externalId = gerarExternalId();
+        
+        // Converter valor para centavos
+        const valorCentavos = Math.round(Number(valor) * 100);
+
+        // Criar transação na BuckPay
+        const buckpayBody = {
+            external_id: externalId,
+            payment_method: 'pix',
+            amount: valorCentavos,
+            buyer: {
+                name: nome,
+                email: email
+            }
         };
 
-        const result = await payment.create({ body });
-
-        // Log para debug
-        console.log('🔥 Pagamento criado:', {
-            id: result.id,
+        console.log('🔥 Criando transação BuckPay:', {
+            external_id: externalId,
             valor: valor,
-            email: email,
-            webhook: 'https://unitv.onrender.com/webhook'
+            valor_centavos: valorCentavos,
+            email: email
         });
 
+        const response = await buckpayClient.post('/v1/transactions', buckpayBody);
+        const transaction = response.data.data;
+
+        console.log('✅ Transação BuckPay criada:', {
+            id: transaction.id,
+            external_id: externalId,
+            status: transaction.status
+        });
+
+        // Salvar no banco de dados
         await Pagamento.create({
-            id_pagamento_mp: result.id.toString(),
+            transaction_id: transaction.id,
+            external_id: externalId,
             nome,
             email,
             plano,
@@ -143,107 +181,99 @@ app.post('/api/gerar-pagamento', async (req, res) => {
 
         res.json({
             sucesso: true,
-            id_pagamento: result.id,
-            qr_code_base64: result.point_of_interaction.transaction_data.qr_code_base64,
-            qr_code: result.point_of_interaction.transaction_data.qr_code
+            id_pagamento: transaction.id, // Mantém compatibilidade com frontend
+            qr_code_base64: transaction.pix.qrcode_base64,
+            qr_code: transaction.pix.code
         });
+
     } catch (error) {
-        console.error("ERRO DETALHADO DO MERCADO PAGO:", error.cause || error.message);
+        console.error("ERRO DETALHADO DA BUCKPAY:", error.response?.data || error.message);
         return res.status(500).json({ erro: "Erro ao gerar cobrança PIX." });
     }
 });
 
-// --- WEBHOOK DO MERCADO PAGO MELHORADO ---
+// --- WEBHOOK DA BUCKPAY MELHORADO ---
 app.post('/webhook', async (req, res) => {
     try {
-        console.log('📩 Webhook recebido:', JSON.stringify(req.body, null, 2));
+        console.log('📩 Webhook BuckPay recebido:', JSON.stringify(req.body, null, 2));
         console.log('📍 Headers:', JSON.stringify(req.headers, null, 2));
         
-        const { type, data } = req.body;
+        const { event, data } = req.body;
 
-        if (type === 'payment') {
-            const paymentId = data.id;
-            console.log('💳 Processando pagamento ID:', paymentId);
-            
-            const payment = new Payment(client);
-            const paymentData = await payment.get({ id: paymentId });
+        if (event === 'transaction.processed' && data.status === 'paid') {
+            const transactionId = data.id;
+            console.log('💳 Processando transação paga ID:', transactionId);
 
-            console.log('💰 Status do pagamento:', paymentData.status);
-            console.log('💰 Dados completos:', JSON.stringify(paymentData, null, 2));
+            const pagamentoLocal = await Pagamento.findOne({
+                where: { transaction_id: transactionId }
+            });
 
-            if (paymentData.status === 'approved') {
-                const pagamentoLocal = await Pagamento.findOne({
-                    where: { id_pagamento_mp: paymentId.toString() }
-                });
+            console.log('🔍 Pagamento local encontrado:', pagamentoLocal ? 'SIM' : 'NÃO');
 
-                console.log('🔍 Pagamento local encontrado:', pagamentoLocal ? 'SIM' : 'NÃO');
+            if (pagamentoLocal && pagamentoLocal.status === 'pending') {
+                console.log('🔄 Iniciando entrega do código...');
+                
+                // Usar transaction para garantir atomicidade
+                const t = await sequelize.transaction();
+                
+                try {
+                    const codigo = await Codigo.findOne({ 
+                        where: { status: 'disponivel' },
+                        transaction: t
+                    });
 
-                if (pagamentoLocal && pagamentoLocal.status === 'pending') {
-                    console.log('🔄 Iniciando entrega do código...');
-                    
-                    // Usar transaction para garantir atomicidade
-                    const t = await sequelize.transaction();
-                    
-                    try {
-                        const codigo = await Codigo.findOne({ 
-                            where: { status: 'disponivel' },
-                            transaction: t
+                    console.log('📦 Código disponível encontrado:', codigo ? codigo.codigo : 'NENHUM');
+
+                    if (codigo) {
+                        // Marcar código como vendido
+                        await codigo.update({
+                            status: 'vendido',
+                            transaction_id: transactionId
+                        }, { transaction: t });
+                        
+                        // Atualizar pagamento no nosso banco
+                        await pagamentoLocal.update({
+                            status: 'approved', // Mantém compatibilidade
+                            codigo_entregue: codigo.codigo
+                        }, { transaction: t });
+
+                        await t.commit();
+                        
+                        console.log('✅ SUCESSO! Código entregue:', codigo.codigo, 'para:', pagamentoLocal.email);
+                        console.log('📧 Cliente:', pagamentoLocal.nome, '- Plano:', pagamentoLocal.plano);
+                        
+                        // Resposta de sucesso
+                        res.status(200).json({ 
+                            status: 'success', 
+                            codigo_entregue: codigo.codigo,
+                            cliente: pagamentoLocal.email
                         });
-
-                        console.log('📦 Código disponível encontrado:', codigo ? codigo.codigo : 'NENHUM');
-
-                        if (codigo) {
-                            // Marcar código como vendido
-                            await codigo.update({
-                                status: 'vendido',
-                                id_pagamento_mp: paymentId.toString()
-                            }, { transaction: t });
-                            
-                            // Atualizar pagamento no nosso banco
-                            await pagamentoLocal.update({
-                                status: 'approved',
-                                codigo_entregue: codigo.codigo
-                            }, { transaction: t });
-
-                            await t.commit();
-                            
-                            console.log('✅ SUCESSO! Código entregue:', codigo.codigo, 'para:', pagamentoLocal.email);
-                            console.log('📧 Cliente:', pagamentoLocal.nome, '- Plano:', pagamentoLocal.plano);
-                            
-                            // Resposta de sucesso
-                            res.status(200).json({ 
-                                status: 'success', 
-                                codigo_entregue: codigo.codigo,
-                                cliente: pagamentoLocal.email
-                            });
-                            return;
-                        } else {
-                            await t.rollback();
-                            console.error('❌ CRÍTICO: Pagamento aprovado sem códigos disponíveis em estoque! ID do Pagamento:', paymentId);
-                            console.error('📧 Cliente afetado:', pagamentoLocal.email);
-                            
-                            // TODO: Enviar email de alerta para admin
-                            res.status(200).json({ status: 'no_stock', message: 'Sem códigos em estoque' });
-                            return;
-                        }
-                    } catch (error) {
+                        return;
+                    } else {
                         await t.rollback();
-                        console.error('❌ Erro na transação:', error);
-                        res.status(500).json({ status: 'error', error: error.message });
+                        console.error('❌ CRÍTICO: Pagamento aprovado sem códigos disponíveis em estoque! ID da Transação:', transactionId);
+                        console.error('📧 Cliente afetado:', pagamentoLocal.email);
+                        
+                        res.status(200).json({ status: 'no_stock', message: 'Sem códigos em estoque' });
                         return;
                     }
-                } else if (pagamentoLocal && pagamentoLocal.status === 'approved') {
-                    console.log('ℹ️ Pagamento já foi processado anteriormente');
-                    res.status(200).json({ status: 'already_processed' });
+                } catch (error) {
+                    await t.rollback();
+                    console.error('❌ Erro na transação:', error);
+                    res.status(500).json({ status: 'error', error: error.message });
                     return;
-                } else {
-                    console.log('⚠️ Pagamento local não encontrado ou status inválido');
                 }
+            } else if (pagamentoLocal && pagamentoLocal.status === 'approved') {
+                console.log('ℹ️ Pagamento já foi processado anteriormente');
+                res.status(200).json({ status: 'already_processed' });
+                return;
             } else {
-                console.log('💰 Pagamento não aprovado. Status:', paymentData.status);
+                console.log('⚠️ Pagamento local não encontrado ou status inválido');
             }
+        } else if (event === 'transaction.created') {
+            console.log('📩 Transação criada (pending) - ignorando');
         } else {
-            console.log('📩 Webhook não é de pagamento. Type:', type);
+            console.log('📩 Evento não processado:', event, '- Status:', data?.status);
         }
         
         res.status(200).json({ status: 'received' });
@@ -260,8 +290,9 @@ app.post('/api/verificar-pagamento', async (req, res) => {
         const { id_pagamento } = req.body;
         console.log('🔍 Verificando pagamento:', id_pagamento);
         
+        // Procurar por transaction_id (mantém compatibilidade)
         const pagamento = await Pagamento.findOne({
-            where: { id_pagamento_mp: id_pagamento.toString() }
+            where: { transaction_id: id_pagamento.toString() }
         });
 
         if (!pagamento) {
@@ -280,6 +311,64 @@ app.post('/api/verificar-pagamento', async (req, res) => {
                 nome: pagamento.nome,
                 plano: pagamento.plano
             });
+        }
+        
+        // Se ainda estiver pending, verificar status na BuckPay
+        if (pagamento.status === 'pending') {
+            try {
+                console.log('🔄 Verificando status na BuckPay - external_id:', pagamento.external_id);
+                const response = await buckpayClient.get(`/v1/transactions/external_id/${pagamento.external_id}`);
+                const transactionData = response.data.data;
+                
+                console.log('📡 Status BuckPay:', transactionData.status);
+                
+                if (transactionData.status === 'paid') {
+                    // Atualizar status local e processar como webhook
+                    console.log('🎯 Status mudou para paid - processando entrega...');
+                    
+                    const t = await sequelize.transaction();
+                    try {
+                        const codigo = await Codigo.findOne({ 
+                            where: { status: 'disponivel' },
+                            transaction: t
+                        });
+
+                        if (codigo) {
+                            await codigo.update({
+                                status: 'vendido',
+                                transaction_id: id_pagamento.toString()
+                            }, { transaction: t });
+                            
+                            await pagamento.update({
+                                status: 'approved',
+                                codigo_entregue: codigo.codigo
+                            }, { transaction: t });
+
+                            await t.commit();
+                            
+                            console.log('✅ Código entregue via verificação:', codigo.codigo);
+                            
+                            return res.json({
+                                sucesso: true,
+                                status: 'approved',
+                                codigo: codigo.codigo,
+                                nome: pagamento.nome,
+                                plano: pagamento.plano
+                            });
+                        } else {
+                            await t.rollback();
+                            console.error('❌ Sem códigos disponíveis');
+                            return res.json({ sucesso: true, status: 'no_stock' });
+                        }
+                    } catch (error) {
+                        await t.rollback();
+                        throw error;
+                    }
+                }
+            } catch (buckpayError) {
+                console.error('⚠️ Erro ao consultar BuckPay:', buckpayError.response?.data || buckpayError.message);
+                // Continua com status local em caso de erro na API
+            }
         }
         
         return res.json({ sucesso: true, status: pagamento.status });
@@ -332,6 +421,7 @@ app.get('/admin/status', async (req, res) => {
         res.json({
             codigos: stats,
             pagamentos_aprovados: pagamentos,
+            payment_provider: 'BuckPay',
             timestamp: new Date().toISOString()
         });
     } catch (error) {
@@ -340,7 +430,7 @@ app.get('/admin/status', async (req, res) => {
     }
 });
 
-// --- ADMIN: LISTAR TODOS OS PAGAMENTOS (NOVA ROTA PARA DEBUG) ---
+// --- ADMIN: LISTAR TODOS OS PAGAMENTOS ---
 app.get('/admin/pagamentos', async (req, res) => {
     try {
         const pagamentos = await Pagamento.findAll({
@@ -350,7 +440,8 @@ app.get('/admin/pagamentos', async (req, res) => {
         
         res.json({
             total: pagamentos.length,
-            pagamentos: pagamentos
+            pagamentos: pagamentos,
+            payment_provider: 'BuckPay'
         });
     } catch (error) {
         console.error("Erro ao buscar pagamentos:", error);
@@ -358,20 +449,19 @@ app.get('/admin/pagamentos', async (req, res) => {
     }
 });
 
-// --- ROTA NOVA: RESETAR CÓDIGOS E PAGAMENTOS ---
+// --- ROTA: RESETAR CÓDIGOS E PAGAMENTOS ---
 app.get('/resetar-codigos', async (req, res) => {
-    // TODO: Adicionar proteção por senha
     try {
         const t = await sequelize.transaction();
         
         try {
-            // Passo 1: Reseta todos os códigos com status 'vendido' para 'disponivel'
+            // Resetar códigos vendidos para disponíveis
             const [updatedCodigosCount] = await Codigo.update(
-                { status: 'disponivel', id_pagamento_mp: null },
+                { status: 'disponivel', transaction_id: null },
                 { where: { status: 'vendido' }, transaction: t }
             );
 
-            // Passo 2: Deleta TODOS os registros da tabela de pagamentos
+            // Deletar todos os pagamentos
             const deletedPagamentosCount = await Pagamento.destroy({
                 where: {},
                 truncate: true,
@@ -412,12 +502,13 @@ app.use((req, res) => {
 // --- INICIAR SERVIDOR ---
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, async () => {
-    console.log(`🚀 Servidor rodando na porta ${PORT}`);
+    console.log(`🚀 Servidor UniTV-BuckPay rodando na porta ${PORT}`);
     console.log(`📍 Rotas de monitoramento:`);
     console.log(`   - Ping: https://unitv.onrender.com/ping`);
     console.log(`   - Health: https://unitv.onrender.com/health`);
     console.log(`   - Status: https://unitv.onrender.com/admin/status`);
     console.log(`📍 Webhook fixo: https://unitv.onrender.com/webhook`);
+    console.log(`💳 Provider de pagamento: BuckPay`);
     
     try {
         await sequelize.authenticate();
