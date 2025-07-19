@@ -29,6 +29,11 @@ const Codigo = sequelize.define('Codigo', {
         type: DataTypes.STRING,
         defaultValue: 'disponivel' // disponivel, vendido
     },
+    // Suporte para ambas as colunas durante migração
+    id_pagamento_mp: {
+        type: DataTypes.STRING,
+        allowNull: true
+    },
     transaction_id: {
         type: DataTypes.STRING,
         allowNull: true
@@ -36,15 +41,20 @@ const Codigo = sequelize.define('Codigo', {
 }, {});
 
 const Pagamento = sequelize.define('Pagamento', {
+    // Suporte para ambas as colunas durante migração
+    id_pagamento_mp: {
+        type: DataTypes.STRING,
+        allowNull: true,
+        unique: true
+    },
     transaction_id: {
         type: DataTypes.STRING,
-        allowNull: false,
+        allowNull: true,
         unique: true
     },
     external_id: {
         type: DataTypes.STRING,
-        allowNull: false,
-        unique: true
+        allowNull: true // Temporário para migração
     },
     nome: { type: DataTypes.STRING, allowNull: false },
     email: { type: DataTypes.STRING, allowNull: false },
@@ -53,6 +63,74 @@ const Pagamento = sequelize.define('Pagamento', {
     status: { type: DataTypes.STRING, defaultValue: 'pending' }, // pending, approved, cancelled
     codigo_entregue: { type: DataTypes.STRING, allowNull: true }
 }, {});
+
+// --- FUNÇÃO DE MIGRAÇÃO AUTOMÁTICA ---
+async function executarMigracoes() {
+    const queryInterface = sequelize.getQueryInterface();
+    
+    try {
+        console.log('🔄 Iniciando migrações automáticas...');
+        
+        // 1. Verificar se coluna transaction_id existe na tabela Codigos
+        const codigosColumns = await queryInterface.describeTable('Codigos');
+        
+        if (!codigosColumns.transaction_id && codigosColumns.id_pagamento_mp) {
+            console.log('📝 Migração 1: Renomeando id_pagamento_mp → transaction_id na tabela Codigos');
+            
+            // Adicionar nova coluna
+            await queryInterface.addColumn('Codigos', 'transaction_id', {
+                type: DataTypes.STRING,
+                allowNull: true
+            });
+            
+            // Copiar dados da coluna antiga para nova
+            await sequelize.query('UPDATE "Codigos" SET transaction_id = id_pagamento_mp WHERE id_pagamento_mp IS NOT NULL');
+            
+            // Remover coluna antiga
+            await queryInterface.removeColumn('Codigos', 'id_pagamento_mp');
+            
+            console.log('✅ Migração 1 concluída: Codigos.transaction_id');
+        }
+        
+        // 2. Verificar se coluna external_id existe na tabela Pagamentos
+        const pagamentosColumns = await queryInterface.describeTable('Pagamentos');
+        
+        if (!pagamentosColumns.external_id) {
+            console.log('📝 Migração 2: Adicionando coluna external_id na tabela Pagamentos');
+            await queryInterface.addColumn('Pagamentos', 'external_id', {
+                type: DataTypes.STRING,
+                allowNull: true
+            });
+            console.log('✅ Migração 2 concluída: Pagamentos.external_id');
+        }
+        
+        // 3. Verificar se precisa renomear id_pagamento_mp → transaction_id na tabela Pagamentos
+        if (!pagamentosColumns.transaction_id && pagamentosColumns.id_pagamento_mp) {
+            console.log('📝 Migração 3: Renomeando id_pagamento_mp → transaction_id na tabela Pagamentos');
+            
+            // Adicionar nova coluna
+            await queryInterface.addColumn('Pagamentos', 'transaction_id', {
+                type: DataTypes.STRING,
+                allowNull: true,
+                unique: true
+            });
+            
+            // Copiar dados da coluna antiga para nova
+            await sequelize.query('UPDATE "Pagamentos" SET transaction_id = id_pagamento_mp WHERE id_pagamento_mp IS NOT NULL');
+            
+            // Remover coluna antiga
+            await queryInterface.removeColumn('Pagamentos', 'id_pagamento_mp');
+            
+            console.log('✅ Migração 3 concluída: Pagamentos.transaction_id');
+        }
+        
+        console.log('🎉 Todas as migrações foram executadas com sucesso!');
+        
+    } catch (error) {
+        console.error('❌ Erro durante migração:', error);
+        throw error;
+    }
+}
 
 const app = express();
 app.use(cors());
@@ -290,10 +368,17 @@ app.post('/api/verificar-pagamento', async (req, res) => {
         const { id_pagamento } = req.body;
         console.log('🔍 Verificando pagamento:', id_pagamento);
         
-        // Procurar por transaction_id (mantém compatibilidade)
-        const pagamento = await Pagamento.findOne({
+        // Procurar por transaction_id OU id_pagamento_mp (compatibilidade)
+        let pagamento = await Pagamento.findOne({
             where: { transaction_id: id_pagamento.toString() }
         });
+        
+        // Se não encontrar por transaction_id, tentar por id_pagamento_mp (dados antigos)
+        if (!pagamento) {
+            pagamento = await Pagamento.findOne({
+                where: { id_pagamento_mp: id_pagamento.toString() }
+            });
+        }
 
         if (!pagamento) {
             console.log('❌ Pagamento não encontrado:', id_pagamento);
@@ -513,7 +598,11 @@ app.listen(PORT, async () => {
     try {
         await sequelize.authenticate();
         console.log('✅ Conexão com o banco de dados estabelecida com sucesso.');
-        await sequelize.sync({ alter: true });
+        
+        // Executar migrações antes de sincronizar
+        await executarMigracoes();
+        
+        await sequelize.sync({ alter: false }); // Não alterar após migrações manuais
         console.log('✅ Tabelas sincronizadas.');
     } catch (error) {
         console.error('❌ Não foi possível conectar ao banco de dados:', error);
