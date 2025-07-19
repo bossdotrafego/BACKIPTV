@@ -59,6 +59,51 @@ app.use(express.static('.'));
 // --- CONFIGURAÇÃO DO MERCADO PAGO ---
 const client = new MercadoPagoConfig({ accessToken: process.env.MERCADO_PAGO_TOKEN });
 
+// ===================================================================
+//                    ROTA DE PING PARA UPTIME MONITORING
+// ===================================================================
+
+// --- ROTA DE PING OTIMIZADA ---
+app.get('/ping', (req, res) => {
+    res.status(200).json({ 
+        status: 'online',
+        service: 'UniTV Backend',
+        timestamp: new Date().toISOString(),
+        uptime: process.uptime(),
+        memory: process.memoryUsage(),
+        version: '1.0.0'
+    });
+});
+
+// --- ROTA DE HEALTH CHECK ---
+app.get('/health', async (req, res) => {
+    try {
+        // Testa conexão com banco
+        await sequelize.authenticate();
+        
+        // Conta códigos disponíveis
+        const codigosDisponiveis = await Codigo.count({ where: { status: 'disponivel' } });
+        
+        res.status(200).json({
+            status: 'healthy',
+            database: 'connected',
+            codigosDisponiveis,
+            timestamp: new Date().toISOString()
+        });
+    } catch (error) {
+        res.status(503).json({
+            status: 'unhealthy',
+            database: 'disconnected',
+            error: error.message,
+            timestamp: new Date().toISOString()
+        });
+    }
+});
+
+// ===================================================================
+//                    ROTAS DE PAGAMENTO
+// ===================================================================
+
 // --- ROTA: GERAR PAGAMENTO ---
 app.post('/api/gerar-pagamento', async (req, res) => {
     try {
@@ -73,10 +118,19 @@ app.post('/api/gerar-pagamento', async (req, res) => {
             description: `Recarga UniTV - ${plano}`,
             payment_method_id: 'pix',
             payer: { email: email, first_name: nome },
-            notification_url: `${process.env.WEBHOOK_URL || 'https://unitv.onrender.com'}/webhook`,
+            // WEBHOOK CORRIGIDO - SEMPRE FIXO PARA EVITAR PROBLEMAS
+            notification_url: 'https://unitv.onrender.com/webhook',
         };
 
         const result = await payment.create({ body });
+
+        // Log para debug
+        console.log('🔥 Pagamento criado:', {
+            id: result.id,
+            valor: valor,
+            email: email,
+            webhook: 'https://unitv.onrender.com/webhook'
+        });
 
         await Pagamento.create({
             id_pagamento_mp: result.id.toString(),
@@ -99,55 +153,104 @@ app.post('/api/gerar-pagamento', async (req, res) => {
     }
 });
 
-// --- WEBHOOK DO MERCADO PAGO ---
+// --- WEBHOOK DO MERCADO PAGO MELHORADO ---
 app.post('/webhook', async (req, res) => {
     try {
-        console.log('📩 Webhook recebido:', req.body);
+        console.log('📩 Webhook recebido:', JSON.stringify(req.body, null, 2));
+        console.log('📍 Headers:', JSON.stringify(req.headers, null, 2));
+        
         const { type, data } = req.body;
 
         if (type === 'payment') {
             const paymentId = data.id;
+            console.log('💳 Processando pagamento ID:', paymentId);
+            
             const payment = new Payment(client);
             const paymentData = await payment.get({ id: paymentId });
 
             console.log('💰 Status do pagamento:', paymentData.status);
+            console.log('💰 Dados completos:', JSON.stringify(paymentData, null, 2));
 
             if (paymentData.status === 'approved') {
                 const pagamentoLocal = await Pagamento.findOne({
                     where: { id_pagamento_mp: paymentId.toString() }
                 });
 
+                console.log('🔍 Pagamento local encontrado:', pagamentoLocal ? 'SIM' : 'NÃO');
+
                 if (pagamentoLocal && pagamentoLocal.status === 'pending') {
-                    // RECOMENDAÇÃO: Usar uma transaction para garantir que ambas as operações (atualizar código e pagamento) ocorram com sucesso.
-                    // Se uma falhar, a outra é revertida. Ex: const t = await sequelize.transaction();
-                    const codigo = await Codigo.findOne({ where: { status: 'disponivel' } });
-
-                    if (codigo) {
-                        // Marcar código como vendido
-                        await codigo.update({
-                            status: 'vendido',
-                            id_pagamento_mp: paymentId.toString()
-                        });
-                        
-                        // Atualizar pagamento no nosso banco
-                        await pagamentoLocal.update({
-                            status: 'approved',
-                            codigo_entregue: codigo.codigo
+                    console.log('🔄 Iniciando entrega do código...');
+                    
+                    // Usar transaction para garantir atomicidade
+                    const t = await sequelize.transaction();
+                    
+                    try {
+                        const codigo = await Codigo.findOne({ 
+                            where: { status: 'disponivel' },
+                            transaction: t
                         });
 
-                        console.log('✅ Código entregue:', codigo.codigo, 'para:', pagamentoLocal.email);
-                    } else {
-                        // ALERTA CRÍTICO: Pagamento aprovado, mas não há códigos em estoque!
-                        // O ideal é notificar o administrador por email para que ele possa resolver manualmente.
-                        console.error('❌ CRÍTICO: Pagamento aprovado sem códigos disponíveis em estoque! ID do Pagamento:', paymentId);
+                        console.log('📦 Código disponível encontrado:', codigo ? codigo.codigo : 'NENHUM');
+
+                        if (codigo) {
+                            // Marcar código como vendido
+                            await codigo.update({
+                                status: 'vendido',
+                                id_pagamento_mp: paymentId.toString()
+                            }, { transaction: t });
+                            
+                            // Atualizar pagamento no nosso banco
+                            await pagamentoLocal.update({
+                                status: 'approved',
+                                codigo_entregue: codigo.codigo
+                            }, { transaction: t });
+
+                            await t.commit();
+                            
+                            console.log('✅ SUCESSO! Código entregue:', codigo.codigo, 'para:', pagamentoLocal.email);
+                            console.log('📧 Cliente:', pagamentoLocal.nome, '- Plano:', pagamentoLocal.plano);
+                            
+                            // Resposta de sucesso
+                            res.status(200).json({ 
+                                status: 'success', 
+                                codigo_entregue: codigo.codigo,
+                                cliente: pagamentoLocal.email
+                            });
+                            return;
+                        } else {
+                            await t.rollback();
+                            console.error('❌ CRÍTICO: Pagamento aprovado sem códigos disponíveis em estoque! ID do Pagamento:', paymentId);
+                            console.error('📧 Cliente afetado:', pagamentoLocal.email);
+                            
+                            // TODO: Enviar email de alerta para admin
+                            res.status(200).json({ status: 'no_stock', message: 'Sem códigos em estoque' });
+                            return;
+                        }
+                    } catch (error) {
+                        await t.rollback();
+                        console.error('❌ Erro na transação:', error);
+                        res.status(500).json({ status: 'error', error: error.message });
+                        return;
                     }
+                } else if (pagamentoLocal && pagamentoLocal.status === 'approved') {
+                    console.log('ℹ️ Pagamento já foi processado anteriormente');
+                    res.status(200).json({ status: 'already_processed' });
+                    return;
+                } else {
+                    console.log('⚠️ Pagamento local não encontrado ou status inválido');
                 }
+            } else {
+                console.log('💰 Pagamento não aprovado. Status:', paymentData.status);
             }
+        } else {
+            console.log('📩 Webhook não é de pagamento. Type:', type);
         }
-        res.status(200).send('OK');
+        
+        res.status(200).json({ status: 'received' });
     } catch (error) {
         console.error('❌ Erro no webhook:', error);
-        res.status(500).send('Erro');
+        console.error('❌ Stack trace:', error.stack);
+        res.status(500).json({ status: 'error', error: error.message });
     }
 });
 
@@ -155,15 +258,21 @@ app.post('/webhook', async (req, res) => {
 app.post('/api/verificar-pagamento', async (req, res) => {
     try {
         const { id_pagamento } = req.body;
+        console.log('🔍 Verificando pagamento:', id_pagamento);
+        
         const pagamento = await Pagamento.findOne({
             where: { id_pagamento_mp: id_pagamento.toString() }
         });
 
         if (!pagamento) {
+            console.log('❌ Pagamento não encontrado:', id_pagamento);
             return res.json({ sucesso: false, erro: 'Pagamento não encontrado' });
         }
         
+        console.log('💰 Status do pagamento:', pagamento.status);
+        
         if (pagamento.status === 'approved' && pagamento.codigo_entregue) {
+            console.log('✅ Pagamento aprovado, código:', pagamento.codigo_entregue);
             return res.json({
                 sucesso: true,
                 status: 'approved',
@@ -181,12 +290,11 @@ app.post('/api/verificar-pagamento', async (req, res) => {
 });
 
 // ===================================================================
-//                    ROTAS DE ADMINISTRAÇÃO
+//                    ROTAS DE ADMINISTRAÇÃO
 // ===================================================================
 
 // --- ADMIN: PÁGINA PRINCIPAL ---
 app.get('/', (req, res) => {
-    // Verifique se o nome do arquivo "admin_adicionar.html" está correto
     res.sendFile(path.join(__dirname, 'admin_adicionar.html'));
 });
 
@@ -214,8 +322,6 @@ app.post('/admin/adicionar', async (req, res) => {
 
 // --- ADMIN: STATUS DOS CÓDIGOS ---
 app.get('/admin/status', async (req, res) => {
-    // RECOMENDAÇÃO DE SEGURANÇA: Esta rota está desprotegida.
-    // O ideal seria criar um middleware que verifica a senha de admin para esta rota e a de reset.
     try {
         const stats = await sequelize.query(
             `SELECT status, COUNT(*) as quantidade FROM "Codigos" GROUP BY status`, 
@@ -225,7 +331,8 @@ app.get('/admin/status', async (req, res) => {
         
         res.json({
             codigos: stats,
-            pagamentos_aprovados: pagamentos
+            pagamentos_aprovados: pagamentos,
+            timestamp: new Date().toISOString()
         });
     } catch (error) {
         console.error("Erro ao buscar status:", error);
@@ -233,38 +340,85 @@ app.get('/admin/status', async (req, res) => {
     }
 });
 
+// --- ADMIN: LISTAR TODOS OS PAGAMENTOS (NOVA ROTA PARA DEBUG) ---
+app.get('/admin/pagamentos', async (req, res) => {
+    try {
+        const pagamentos = await Pagamento.findAll({
+            order: [['createdAt', 'DESC']],
+            limit: 50
+        });
+        
+        res.json({
+            total: pagamentos.length,
+            pagamentos: pagamentos
+        });
+    } catch (error) {
+        console.error("Erro ao buscar pagamentos:", error);
+        res.status(500).json({ erro: "Erro interno" });
+    }
+});
+
 // --- ROTA NOVA: RESETAR CÓDIGOS E PAGAMENTOS ---
 app.get('/resetar-codigos', async (req, res) => {
-    // RECOMENDAÇÃO DE SEGURANÇA: Esta rota também deveria ser protegida por senha.
-    // Qualquer pessoa que descobrir a URL pode resetar seus dados.
+    // TODO: Adicionar proteção por senha
     try {
-        // Passo 1: Reseta todos os códigos com status 'vendido' para 'disponivel'
-        const [updatedCodigosCount] = await Codigo.update(
-            { status: 'disponivel', id_pagamento_mp: null },
-            { where: { status: 'vendido' } }
-        );
-
-        // Passo 2: Deleta TODOS os registros da tabela de pagamentos
-        const deletedPagamentosCount = await Pagamento.destroy({
-            where: {},      // Condição vazia para afetar todas as linhas
-            truncate: true  // Mais eficiente para limpar a tabela inteira
-        });
-
-        const mensagem = `♻️ Reset concluído com sucesso!\n\n- ${updatedCodigosCount} códigos foram marcados como 'disponível'.\n- Todos os registros de pagamento foram apagados.`;
+        const t = await sequelize.transaction();
         
-        console.log(mensagem);
-        res.status(200).send(mensagem);
+        try {
+            // Passo 1: Reseta todos os códigos com status 'vendido' para 'disponivel'
+            const [updatedCodigosCount] = await Codigo.update(
+                { status: 'disponivel', id_pagamento_mp: null },
+                { where: { status: 'vendido' }, transaction: t }
+            );
 
+            // Passo 2: Deleta TODOS os registros da tabela de pagamentos
+            const deletedPagamentosCount = await Pagamento.destroy({
+                where: {},
+                truncate: true,
+                transaction: t
+            });
+
+            await t.commit();
+
+            const mensagem = `♻️ Reset concluído com sucesso!\n\n- ${updatedCodigosCount} códigos foram marcados como 'disponível'.\n- Todos os registros de pagamento foram apagados.`;
+            
+            console.log(mensagem);
+            res.status(200).send(mensagem);
+        } catch (error) {
+            await t.rollback();
+            throw error;
+        }
     } catch (error) {
         console.error("❌ Erro ao resetar os dados:", error);
         res.status(500).send("❌ Erro interno do servidor ao tentar resetar os dados.");
     }
 });
 
+// ===================================================================
+//                    MIDDLEWARE DE ERRO E INICIALIZAÇÃO
+// ===================================================================
+
+// --- MIDDLEWARE DE ERRO GLOBAL ---
+app.use((err, req, res, next) => {
+    console.error('❌ Erro não tratado:', err);
+    res.status(500).json({ erro: 'Erro interno do servidor' });
+});
+
+// --- MIDDLEWARE 404 ---
+app.use((req, res) => {
+    res.status(404).json({ erro: 'Rota não encontrada' });
+});
+
 // --- INICIAR SERVIDOR ---
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, async () => {
     console.log(`🚀 Servidor rodando na porta ${PORT}`);
+    console.log(`📍 Rotas de monitoramento:`);
+    console.log(`   - Ping: https://unitv.onrender.com/ping`);
+    console.log(`   - Health: https://unitv.onrender.com/health`);
+    console.log(`   - Status: https://unitv.onrender.com/admin/status`);
+    console.log(`📍 Webhook fixo: https://unitv.onrender.com/webhook`);
+    
     try {
         await sequelize.authenticate();
         console.log('✅ Conexão com o banco de dados estabelecida com sucesso.');
