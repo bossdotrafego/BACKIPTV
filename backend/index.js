@@ -29,11 +29,6 @@ const Codigo = sequelize.define('Codigo', {
         type: DataTypes.STRING,
         defaultValue: 'disponivel' // disponivel, vendido
     },
-    // Suporte para ambas as colunas durante migração
-    id_pagamento_mp: {
-        type: DataTypes.STRING,
-        allowNull: true
-    },
     transaction_id: {
         type: DataTypes.STRING,
         allowNull: true
@@ -41,12 +36,6 @@ const Codigo = sequelize.define('Codigo', {
 }, {});
 
 const Pagamento = sequelize.define('Pagamento', {
-    // Suporte para ambas as colunas durante migração
-    id_pagamento_mp: {
-        type: DataTypes.STRING,
-        allowNull: true,
-        unique: true
-    },
     transaction_id: {
         type: DataTypes.STRING,
         allowNull: true,
@@ -54,7 +43,7 @@ const Pagamento = sequelize.define('Pagamento', {
     },
     external_id: {
         type: DataTypes.STRING,
-        allowNull: true // Temporário para migração
+        allowNull: true
     },
     nome: { type: DataTypes.STRING, allowNull: false },
     email: { type: DataTypes.STRING, allowNull: false },
