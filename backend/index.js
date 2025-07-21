@@ -137,7 +137,7 @@ app.use(cors());
 app.use(express.json());
 
 // --- SERVIR ARQUIVOS ESTÁTICOS ---
-app.use(express.static('.'));
+app.use(express.static(__dirname));
 
 // --- CONFIGURAÇÃO DA BUCKPAY ---
 const BUCKPAY_API_BASE = 'https://api.realtechdev.com.br';
@@ -147,7 +147,8 @@ const buckpayClient = axios.create({
     baseURL: BUCKPAY_API_BASE,
     headers: {
         'Authorization': `Bearer ${BUCKPAY_SECRET_TOKEN}`,
-        'Content-Type': 'application/json'
+        'Content-Type': 'application/json',
+        'User-Agent': 'Buckpay API'
     }
 });
 
