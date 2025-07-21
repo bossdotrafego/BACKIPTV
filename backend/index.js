@@ -137,7 +137,7 @@ app.use(cors());
 app.use(express.json());
 
 // --- SERVIR ARQUIVOS ESTÁTICOS ---
-app.use(express.static('.'));
+app.use(express.static(__dirname));
 
 // --- CONFIGURAÇÃO DA BUCKPAY ---
 const BUCKPAY_API_BASE = 'https://api.realtechdev.com.br';
