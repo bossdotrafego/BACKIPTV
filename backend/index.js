@@ -5,6 +5,11 @@ const path = require('path');
 const axios = require('axios');
 const { Sequelize, DataTypes } = require('sequelize');
 
+// === IMPORTAÇÃO DO WHATSAPP ===
+const WhatsAppClient = require('./whatsapp/evolution');
+const createWhatsAppRoutes = require('./whatsapp/routes');
+const MessageTemplates = require('./whatsapp/messages');
+
 // --- CONFIGURAÇÃO DO BANCO DE DADOS ---
 const sequelize = new Sequelize(process.env.DB_NAME, process.env.DB_USER, process.env.DB_PASSWORD, {
     host: process.env.DB_HOST,
@@ -18,7 +23,7 @@ const sequelize = new Sequelize(process.env.DB_NAME, process.env.DB_USER, proces
     }
 });
 
-// --- MODELOS DO BANCO ---
+// --- MODELOS DO BANCO (ATUALIZADOS PARA WHATSAPP) ---
 const Codigo = sequelize.define('Codigo', {
     codigo: {
         type: DataTypes.STRING,
@@ -46,14 +51,20 @@ const Pagamento = sequelize.define('Pagamento', {
         allowNull: true
     },
     nome: { type: DataTypes.STRING, allowNull: false },
-    email: { type: DataTypes.STRING, allowNull: false },
+    email: { type: DataTypes.STRING, allowNull: true }, // Agora opcional
+    whatsapp: { type: DataTypes.STRING, allowNull: true }, // Novo campo
     plano: { type: DataTypes.STRING, allowNull: false },
     valor: { type: DataTypes.DECIMAL(10, 2), allowNull: false },
     status: { type: DataTypes.STRING, defaultValue: 'pending' }, // pending, approved, cancelled
-    codigo_entregue: { type: DataTypes.STRING, allowNull: true }
+    codigo_entregue: { type: DataTypes.STRING, allowNull: true },
+    whatsapp_enviado: { type: DataTypes.BOOLEAN, defaultValue: false } // Controle de envio
 }, {});
 
-// --- FUNÇÃO DE MIGRAÇÃO AUTOMÁTICA ---
+// --- INICIALIZAR WHATSAPP CLIENT ---
+const whatsappClient = new WhatsAppClient();
+let whatsappEnabled = process.env.WHATSAPP_ENABLED === 'true';
+
+// --- FUNÇÃO DE MIGRAÇÃO AUTOMÁTICA (ATUALIZADA) ---
 async function executarMigracoes() {
     const queryInterface = sequelize.getQueryInterface();
     
@@ -66,16 +77,12 @@ async function executarMigracoes() {
         if (!codigosColumns.transaction_id && codigosColumns.id_pagamento_mp) {
             console.log('📝 Migração 1: Renomeando id_pagamento_mp → transaction_id na tabela Codigos');
             
-            // Adicionar nova coluna
             await queryInterface.addColumn('Codigos', 'transaction_id', {
                 type: DataTypes.STRING,
                 allowNull: true
             });
             
-            // Copiar dados da coluna antiga para nova
             await sequelize.query('UPDATE "Codigos" SET transaction_id = id_pagamento_mp WHERE id_pagamento_mp IS NOT NULL');
-            
-            // Remover coluna antiga
             await queryInterface.removeColumn('Codigos', 'id_pagamento_mp');
             
             console.log('✅ Migração 1 concluída: Codigos.transaction_id');
@@ -97,20 +104,49 @@ async function executarMigracoes() {
         if (!pagamentosColumns.transaction_id && pagamentosColumns.id_pagamento_mp) {
             console.log('📝 Migração 3: Renomeando id_pagamento_mp → transaction_id na tabela Pagamentos');
             
-            // Adicionar nova coluna
             await queryInterface.addColumn('Pagamentos', 'transaction_id', {
                 type: DataTypes.STRING,
                 allowNull: true,
                 unique: true
             });
             
-            // Copiar dados da coluna antiga para nova
             await sequelize.query('UPDATE "Pagamentos" SET transaction_id = id_pagamento_mp WHERE id_pagamento_mp IS NOT NULL');
-            
-            // Remover coluna antiga
             await queryInterface.removeColumn('Pagamentos', 'id_pagamento_mp');
             
             console.log('✅ Migração 3 concluída: Pagamentos.transaction_id');
+        }
+        
+        // === NOVAS MIGRAÇÕES PARA WHATSAPP ===
+        
+        // 4. Adicionar coluna whatsapp
+        if (!pagamentosColumns.whatsapp) {
+            console.log('📝 Migração 4: Adicionando coluna whatsapp na tabela Pagamentos');
+            await queryInterface.addColumn('Pagamentos', 'whatsapp', {
+                type: DataTypes.STRING,
+                allowNull: true
+            });
+            console.log('✅ Migração 4 concluída: Pagamentos.whatsapp');
+        }
+        
+        // 5. Adicionar coluna whatsapp_enviado
+        if (!pagamentosColumns.whatsapp_enviado) {
+            console.log('📝 Migração 5: Adicionando coluna whatsapp_enviado na tabela Pagamentos');
+            await queryInterface.addColumn('Pagamentos', 'whatsapp_enviado', {
+                type: DataTypes.BOOLEAN,
+                defaultValue: false,
+                allowNull: false
+            });
+            console.log('✅ Migração 5 concluída: Pagamentos.whatsapp_enviado');
+        }
+        
+        // 6. Tornar email opcional (permitir NULL)
+        if (pagamentosColumns.email && !pagamentosColumns.email.allowNull) {
+            console.log('📝 Migração 6: Tornando email opcional na tabela Pagamentos');
+            await queryInterface.changeColumn('Pagamentos', 'email', {
+                type: DataTypes.STRING,
+                allowNull: true
+            });
+            console.log('✅ Migração 6 concluída: Pagamentos.email agora é opcional');
         }
         
         console.log('🎉 Todas as migrações foram executadas com sucesso!');
@@ -128,6 +164,9 @@ app.use(express.json());
 // --- SERVIR ARQUIVOS ESTÁTICOS ---
 app.use(express.static(__dirname));
 
+// --- USAR ROTAS DO WHATSAPP ---
+app.use('/api/whatsapp', createWhatsAppRoutes(whatsappClient));
+
 // --- CONFIGURAÇÃO DA BUCKPAY ---
 const BUCKPAY_API_BASE = 'https://api.realtechdev.com.br';
 const BUCKPAY_SECRET_TOKEN = process.env.BUCKPAY_SECRET_TOKEN || 'sk_live_a74d213bb8682959c3449ee40c192791';
@@ -141,36 +180,65 @@ const buckpayClient = axios.create({
     }
 });
 
+// === FUNÇÃO AUXILIAR PARA ENVIO DE WHATSAPP ===
+async function enviarWhatsAppCodigo(nome, whatsapp, codigo, plano) {
+    if (!whatsappEnabled || !whatsappClient.isConnected) {
+        console.log('⚠️ WhatsApp desabilitado ou desconectado, pulando envio');
+        return { success: false, reason: 'WhatsApp não disponível' };
+    }
+    
+    try {
+        const mensagem = MessageTemplates.codigoEntrega(nome, codigo, plano);
+        const result = await whatsappClient.sendMessage(whatsapp, mensagem);
+        
+        if (result.success) {
+            console.log(`✅ WhatsApp enviado para ${nome} (${whatsapp}): ${codigo}`);
+        } else {
+            console.error(`❌ Falha no WhatsApp para ${nome}:`, result.error);
+        }
+        
+        return result;
+    } catch (error) {
+        console.error('❌ Erro ao enviar WhatsApp:', error);
+        return { success: false, error: error.message };
+    }
+}
+
 // ===================================================================
 //                    ROTA DE PING PARA UPTIME MONITORING
 // ===================================================================
 
 // --- ROTA DE PING OTIMIZADA ---
 app.get('/ping', (req, res) => {
+    const whatsappStatus = whatsappClient.getConnectionStatus();
     res.status(200).json({ 
         status: 'online',
-        service: 'UniTV Backend - BuckPay',
+        service: 'UniTV Backend - BuckPay + WhatsApp',
         timestamp: new Date().toISOString(),
         uptime: process.uptime(),
         memory: process.memoryUsage(),
-        version: '2.0.0',
-        payment_provider: 'BuckPay'
+        version: '2.1.0',
+        payment_provider: 'BuckPay',
+        whatsapp: {
+            enabled: whatsappEnabled,
+            connected: whatsappStatus.connected,
+            hasSession: whatsappStatus.hasSession
+        }
     });
 });
 
 // --- ROTA DE HEALTH CHECK ---
 app.get('/health', async (req, res) => {
     try {
-        // Testa conexão com banco
         await sequelize.authenticate();
-        
-        // Conta códigos disponíveis
         const codigosDisponiveis = await Codigo.count({ where: { status: 'disponivel' } });
+        const whatsappStatus = whatsappClient.getConnectionStatus();
         
         res.status(200).json({
             status: 'healthy',
             database: 'connected',
             codigosDisponiveis,
+            whatsapp: whatsappStatus,
             timestamp: new Date().toISOString(),
             payment_provider: 'BuckPay'
         });
@@ -185,7 +253,7 @@ app.get('/health', async (req, res) => {
 });
 
 // ===================================================================
-//                    ROTAS DE PAGAMENTO
+//                    ROTAS DE PAGAMENTO (ATUALIZADAS)
 // ===================================================================
 
 // --- FUNÇÃO AUXILIAR: GERAR EXTERNAL_ID ÚNICO ---
@@ -195,12 +263,18 @@ function gerarExternalId() {
     return `unitv_${timestamp}_${random}`;
 }
 
-// --- ROTA: GERAR PAGAMENTO ---
+// --- ROTA: GERAR PAGAMENTO (ATUALIZADA PARA WHATSAPP) ---
 app.post('/api/gerar-pagamento', async (req, res) => {
     try {
-        const { nome, email, plano, valor } = req.body;
-        if (!nome || !email || !plano || !valor) {
-            return res.status(400).json({ erro: "Dados incompletos." });
+        const { nome, email, whatsapp, plano, valor } = req.body;
+        
+        // Validação: nome e plano são obrigatórios, email OU whatsapp
+        if (!nome || !plano || !valor) {
+            return res.status(400).json({ erro: "Nome, plano e valor são obrigatórios." });
+        }
+        
+        if (!email && !whatsapp) {
+            return res.status(400).json({ erro: "Email ou WhatsApp é obrigatório." });
         }
 
         // Gerar external_id único
@@ -216,7 +290,7 @@ app.post('/api/gerar-pagamento', async (req, res) => {
             amount: valorCentavos,
             buyer: {
                 name: nome,
-                email: email
+                email: email || `${whatsapp}@whatsapp.temp` // Email temporário se não fornecido
             }
         };
 
@@ -224,7 +298,8 @@ app.post('/api/gerar-pagamento', async (req, res) => {
             external_id: externalId,
             valor: valor,
             valor_centavos: valorCentavos,
-            email: email
+            email: email || 'WhatsApp only',
+            whatsapp: whatsapp || 'Email only'
         });
 
         const response = await buckpayClient.post('/v1/transactions', buckpayBody);
@@ -236,20 +311,22 @@ app.post('/api/gerar-pagamento', async (req, res) => {
             status: transaction.status
         });
 
-        // Salvar no banco de dados
+        // Salvar no banco de dados (com suporte a ambos)
         await Pagamento.create({
             transaction_id: transaction.id,
             external_id: externalId,
             nome,
-            email,
+            email: email || null,
+            whatsapp: whatsapp || null,
             plano,
             valor: Number(valor),
-            status: 'pending'
+            status: 'pending',
+            whatsapp_enviado: false
         });
 
         res.json({
             sucesso: true,
-            id_pagamento: transaction.id, // Mantém compatibilidade com frontend
+            id_pagamento: transaction.id,
             qr_code_base64: transaction.pix.qrcode_base64,
             qr_code: transaction.pix.code
         });
@@ -260,11 +337,10 @@ app.post('/api/gerar-pagamento', async (req, res) => {
     }
 });
 
-// --- WEBHOOK DA BUCKPAY MELHORADO ---
+// --- WEBHOOK DA BUCKPAY (ATUALIZADO COM WHATSAPP) ---
 app.post('/webhook', async (req, res) => {
     try {
         console.log('📩 Webhook BuckPay recebido:', JSON.stringify(req.body, null, 2));
-        console.log('📍 Headers:', JSON.stringify(req.headers, null, 2));
         
         const { event, data } = req.body;
 
@@ -281,7 +357,6 @@ app.post('/webhook', async (req, res) => {
             if (pagamentoLocal && pagamentoLocal.status === 'pending') {
                 console.log('🔄 Iniciando entrega do código...');
                 
-                // Usar transaction para garantir atomicidade
                 const t = await sequelize.transaction();
                 
                 try {
@@ -301,26 +376,46 @@ app.post('/webhook', async (req, res) => {
                         
                         // Atualizar pagamento no nosso banco
                         await pagamentoLocal.update({
-                            status: 'approved', // Mantém compatibilidade
+                            status: 'approved',
                             codigo_entregue: codigo.codigo
                         }, { transaction: t });
 
                         await t.commit();
                         
-                        console.log('✅ SUCESSO! Código entregue:', codigo.codigo, 'para:', pagamentoLocal.email);
+                        console.log('✅ SUCESSO! Código entregue:', codigo.codigo);
                         console.log('📧 Cliente:', pagamentoLocal.nome, '- Plano:', pagamentoLocal.plano);
                         
-                        // Resposta de sucesso
+                        // === ENVIAR VIA WHATSAPP SE DISPONÍVEL ===
+                        if (pagamentoLocal.whatsapp && whatsappEnabled) {
+                            console.log('📱 Enviando código via WhatsApp...');
+                            
+                            // Não aguardar o WhatsApp para não travar o webhook
+                            setImmediate(async () => {
+                                const whatsappResult = await enviarWhatsAppCodigo(
+                                    pagamentoLocal.nome,
+                                    pagamentoLocal.whatsapp,
+                                    codigo.codigo,
+                                    pagamentoLocal.plano
+                                );
+                                
+                                if (whatsappResult.success) {
+                                    // Marcar como enviado no banco
+                                    await pagamentoLocal.update({ whatsapp_enviado: true });
+                                    console.log('✅ WhatsApp marcado como enviado');
+                                }
+                            });
+                        }
+                        
                         res.status(200).json({ 
                             status: 'success', 
                             codigo_entregue: codigo.codigo,
-                            cliente: pagamentoLocal.email
+                            cliente: pagamentoLocal.email || pagamentoLocal.whatsapp,
+                            whatsapp_scheduled: !!pagamentoLocal.whatsapp
                         });
                         return;
                     } else {
                         await t.rollback();
-                        console.error('❌ CRÍTICO: Pagamento aprovado sem códigos disponíveis em estoque! ID da Transação:', transactionId);
-                        console.error('📧 Cliente afetado:', pagamentoLocal.email);
+                        console.error('❌ CRÍTICO: Sem códigos em estoque! ID:', transactionId);
                         
                         res.status(200).json({ status: 'no_stock', message: 'Sem códigos em estoque' });
                         return;
@@ -335,41 +430,26 @@ app.post('/webhook', async (req, res) => {
                 console.log('ℹ️ Pagamento já foi processado anteriormente');
                 res.status(200).json({ status: 'already_processed' });
                 return;
-            } else {
-                console.log('⚠️ Pagamento local não encontrado ou status inválido');
             }
-        } else if (event === 'transaction.created') {
-            console.log('📩 Transação criada (pending) - ignorando');
-        } else {
-            console.log('📩 Evento não processado:', event, '- Status:', data?.status);
         }
         
         res.status(200).json({ status: 'received' });
     } catch (error) {
         console.error('❌ Erro no webhook:', error);
-        console.error('❌ Stack trace:', error.stack);
         res.status(500).json({ status: 'error', error: error.message });
     }
 });
 
-// --- VERIFICAR STATUS DO PAGAMENTO ---
+// --- VERIFICAR STATUS DO PAGAMENTO (MANTÉM COMPATIBILIDADE) ---
 app.post('/api/verificar-pagamento', async (req, res) => {
     try {
         const { id_pagamento } = req.body;
         console.log('🔍 Verificando pagamento:', id_pagamento);
         
-        // Procurar por transaction_id OU id_pagamento_mp (compatibilidade)
         let pagamento = await Pagamento.findOne({
             where: { transaction_id: id_pagamento.toString() }
         });
         
-        // Se não encontrar por transaction_id, tentar por id_pagamento_mp (dados antigos)
-        if (!pagamento) {
-            pagamento = await Pagamento.findOne({
-                where: { id_pagamento_mp: id_pagamento.toString() }
-            });
-        }
-
         if (!pagamento) {
             console.log('❌ Pagamento não encontrado:', id_pagamento);
             return res.json({ sucesso: false, erro: 'Pagamento não encontrado' });
@@ -388,7 +468,7 @@ app.post('/api/verificar-pagamento', async (req, res) => {
             });
         }
         
-        // Se ainda estiver pending, verificar status na BuckPay
+        // Verificar status na BuckPay se ainda pending
         if (pagamento.status === 'pending') {
             try {
                 console.log('🔄 Verificando status na BuckPay - external_id:', pagamento.external_id);
@@ -398,7 +478,6 @@ app.post('/api/verificar-pagamento', async (req, res) => {
                 console.log('📡 Status BuckPay:', transactionData.status);
                 
                 if (transactionData.status === 'paid') {
-                    // Atualizar status local e processar como webhook
                     console.log('🎯 Status mudou para paid - processando entrega...');
                     
                     const t = await sequelize.transaction();
@@ -423,6 +502,18 @@ app.post('/api/verificar-pagamento', async (req, res) => {
                             
                             console.log('✅ Código entregue via verificação:', codigo.codigo);
                             
+                            // Enviar WhatsApp se disponível
+                            if (pagamento.whatsapp && whatsappEnabled) {
+                                setImmediate(async () => {
+                                    await enviarWhatsAppCodigo(
+                                        pagamento.nome,
+                                        pagamento.whatsapp,
+                                        codigo.codigo,
+                                        pagamento.plano
+                                    );
+                                });
+                            }
+                            
                             return res.json({
                                 sucesso: true,
                                 status: 'approved',
@@ -442,7 +533,6 @@ app.post('/api/verificar-pagamento', async (req, res) => {
                 }
             } catch (buckpayError) {
                 console.error('⚠️ Erro ao consultar BuckPay:', buckpayError.response?.data || buckpayError.message);
-                // Continua com status local em caso de erro na API
             }
         }
         
@@ -454,20 +544,17 @@ app.post('/api/verificar-pagamento', async (req, res) => {
 });
 
 // ===================================================================
-//                    ROTAS DE ADMINISTRAÇÃO
+//                    ROTAS DE ADMINISTRAÇÃO (MANTIDAS)
 // ===================================================================
 
-// --- ADMIN: PÁGINA PRINCIPAL ---
 app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'admin_adicionar.html'));
 });
 
-// --- PÁGINA DE OBRIGADO ---
 app.get('/obrigado.html', (req, res) => {
     res.sendFile(path.join(__dirname, 'obrigado.html'));
 });
 
-// --- ADMIN: ADICIONAR CÓDIGOS ---
 app.post('/admin/adicionar', async (req, res) => {
     const { senha, codigos } = req.body;
     if (senha !== process.env.SENHA_ADMIN) {
@@ -484,7 +571,6 @@ app.post('/admin/adicionar', async (req, res) => {
     }
 });
 
-// --- ADMIN: STATUS DOS CÓDIGOS ---
 app.get('/admin/status', async (req, res) => {
     try {
         const stats = await sequelize.query(
@@ -492,11 +578,13 @@ app.get('/admin/status', async (req, res) => {
             { type: Sequelize.QueryTypes.SELECT }
         );
         const pagamentos = await Pagamento.count({ where: { status: 'approved' } });
+        const whatsappStatus = whatsappClient.getConnectionStatus();
         
         res.json({
             codigos: stats,
             pagamentos_aprovados: pagamentos,
             payment_provider: 'BuckPay',
+            whatsapp: whatsappStatus,
             timestamp: new Date().toISOString()
         });
     } catch (error) {
@@ -505,7 +593,6 @@ app.get('/admin/status', async (req, res) => {
     }
 });
 
-// --- ADMIN: LISTAR TODOS OS PAGAMENTOS ---
 app.get('/admin/pagamentos', async (req, res) => {
     try {
         const pagamentos = await Pagamento.findAll({
@@ -524,19 +611,16 @@ app.get('/admin/pagamentos', async (req, res) => {
     }
 });
 
-// --- ROTA: RESETAR CÓDIGOS E PAGAMENTOS ---
 app.get('/resetar-codigos', async (req, res) => {
     try {
         const t = await sequelize.transaction();
         
         try {
-            // Resetar códigos vendidos para disponíveis
             const [updatedCodigosCount] = await Codigo.update(
                 { status: 'disponivel', transaction_id: null },
                 { where: { status: 'vendido' }, transaction: t }
             );
 
-            // Deletar todos os pagamentos
             const deletedPagamentosCount = await Pagamento.destroy({
                 where: {},
                 truncate: true,
@@ -563,13 +647,11 @@ app.get('/resetar-codigos', async (req, res) => {
 //                    MIDDLEWARE DE ERRO E INICIALIZAÇÃO
 // ===================================================================
 
-// --- MIDDLEWARE DE ERRO GLOBAL ---
 app.use((err, req, res, next) => {
     console.error('❌ Erro não tratado:', err);
     res.status(500).json({ erro: 'Erro interno do servidor' });
 });
 
-// --- MIDDLEWARE 404 ---
 app.use((req, res) => {
     res.status(404).json({ erro: 'Rota não encontrada' });
 });
@@ -577,23 +659,39 @@ app.use((req, res) => {
 // --- INICIAR SERVIDOR ---
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, async () => {
-    console.log(`🚀 Servidor UniTV-BuckPay rodando na porta ${PORT}`);
+    console.log(`🚀 Servidor UniTV-BuckPay+WhatsApp rodando na porta ${PORT}`);
     console.log(`📍 Rotas de monitoramento:`);
     console.log(`   - Ping: https://unitv.onrender.com/ping`);
     console.log(`   - Health: https://unitv.onrender.com/health`);
     console.log(`   - Status: https://unitv.onrender.com/admin/status`);
     console.log(`📍 Webhook fixo: https://unitv.onrender.com/webhook`);
+    console.log(`📱 WhatsApp API: https://unitv.onrender.com/api/whatsapp/status`);
     console.log(`💳 Provider de pagamento: BuckPay`);
     
     try {
         await sequelize.authenticate();
         console.log('✅ Conexão com o banco de dados estabelecida com sucesso.');
         
-        // Executar migrações antes de sincronizar
         await executarMigracoes();
-        
-        await sequelize.sync({ alter: false }); // Não alterar após migrações manuais
+        await sequelize.sync({ alter: false });
         console.log('✅ Tabelas sincronizadas.');
+        
+        // === INICIALIZAR WHATSAPP ===
+        if (whatsappEnabled) {
+            console.log('📱 Inicializando WhatsApp...');
+            setTimeout(async () => {
+                try {
+                    await whatsappClient.initialize();
+                    console.log('✅ WhatsApp Client inicializado');
+                } catch (error) {
+                    console.error('❌ Erro ao inicializar WhatsApp:', error);
+                    whatsappEnabled = false;
+                }
+            }, 2000); // Aguardar 2s após o servidor iniciar
+        } else {
+            console.log('📱 WhatsApp desabilitado via variável de ambiente');
+        }
+        
     } catch (error) {
         console.error('❌ Não foi possível conectar ao banco de dados:', error);
     }
