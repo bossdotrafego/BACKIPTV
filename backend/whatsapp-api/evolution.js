@@ -1,4 +1,4 @@
-// whatsapp/evolution.js
+// whatsapp-api/evolution.js
 const { default: makeWASocket, DisconnectReason, useMultiFileAuthState } = require('@whiskeysockets/baileys');
 const qrImage = require('qr-image');
 const fs = require('fs');
@@ -25,10 +25,24 @@ class WhatsAppClient {
 
             this.sock = makeWASocket({
                 auth: state,
-                printQRInTerminal: true,
+                printQRInTerminal: false, // Desabilitado para evitar warning
                 logger: {
-                    level: 'error', // Reduzir logs
-                    log: () => {} // Silenciar logs desnecessários
+                    level: 'error',
+                    child: () => ({
+                        level: 'error',
+                        debug: () => {},
+                        info: () => {},
+                        warn: () => {},
+                        error: () => {},
+                        fatal: () => {},
+                        trace: () => {}
+                    }),
+                    debug: () => {},
+                    info: () => {},
+                    warn: () => {},
+                    error: () => {},
+                    fatal: () => {},
+                    trace: () => {}
                 }
             });
 
