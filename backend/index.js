@@ -1,3 +1,26 @@
+Nós estamos quase lá\! Esse erro que voltou a aparecer é o último detalhe a ser ajustado. Peço desculpas pela ida e volta, estamos caçando um erro bem específico.
+
+A imagem e os logs mostram que o problema de sintaxe foi corrigido e o sistema está rodando, mas o erro `QRCode is not defined` voltou.
+
+### Diagnóstico Final e Definitivo
+
+O problema agora é uma "brecha" no nosso código. Acontece o seguinte:
+
+1.  A página carrega e nosso script `attemptLoad` começa a verificar se a biblioteca `QRCode.js` está pronta.
+2.  Enquanto isso, os botões **"Tentar Novamente"** e **"Verificar Status"** já aparecem na tela.
+3.  Se você clicar em "Tentar Novamente" **antes** que a biblioteca `QRCode.js` tenha terminado de baixar, você chama a função `loadQRCode()` diretamente, pulando a verificação de segurança. É isso que causa o erro.
+
+### A Solução Final
+
+A solução é simples: vamos desabilitar os botões diretamente no HTML para que eles só se tornem clicáveis quando o script permitir.
+
+Aqui está a versão final do seu arquivo `index.js` com esta última correção. Pode substituir o arquivo inteiro com este código.
+
+-----
+
+### Código `index.js` Corrigido (Versão Final)
+
+```javascript
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
@@ -385,11 +408,11 @@ app.get('/whatsapp-qr.html', (req, res) => {
             </ol>
         </div>
         
-        <button id="refreshBtn" class="refresh-btn" onclick="loadQRCode()">
-            🔄 Atualizar QR Code
+        <button id="refreshBtn" class="refresh-btn" onclick="loadQRCode()" disabled>
+            🔄 Tentar Novamente
         </button>
         
-        <button id="checkStatusBtn" class="refresh-btn" onclick="checkConnectionStatus()">
+        <button id="checkStatusBtn" class="refresh-btn" onclick="checkConnectionStatus()" disabled>
             📊 Verificar Status
         </button>
     </div>
@@ -415,7 +438,6 @@ app.get('/whatsapp-qr.html', (req, res) => {
 
             for (let i = 0; i < retries; i++) {
                 try {
-                    // CORREÇÃO: Usando aspas simples para o console.log para evitar erro de sintaxe.
                     console.log('Buscando QR Code (Tentativa ' + (i + 1) + '/' + retries + ')...');
                     const response = await fetch('/api/whatsapp/qr');
                     const data = await response.json();
@@ -437,12 +459,11 @@ app.get('/whatsapp-qr.html', (req, res) => {
                         startStatusCheck();
                         refreshBtn.disabled = false;
                         refreshBtn.textContent = '🔄 Atualizar QR Code';
-                        return;
+                        return; 
                     }
                     
                     if (i < retries - 1) {
                         const loadingText = document.querySelector('#loading p');
-                        // CORREÇÃO: Usando aspas simples aqui também.
                         if (loadingText) loadingText.textContent = 'Aguardando o servidor... (' + (i + 1) + '/' + retries + ')';
                         await new Promise(resolve => setTimeout(resolve, delay));
                     } else {
@@ -506,10 +527,12 @@ app.get('/whatsapp-qr.html', (req, res) => {
         
         document.addEventListener('DOMContentLoaded', function() {
             console.log('Página carregada, iniciando verificação da biblioteca...');
+            const checkStatusBtn = document.getElementById('checkStatusBtn');
 
             function attemptLoad() {
                 if (typeof QRCode !== 'undefined') {
                     console.log('✅ Biblioteca QRCode pronta. Carregando dados...');
+                    checkStatusBtn.disabled = false;
                     loadQRCode();
                     checkConnectionStatus();
                 } else {
@@ -1076,3 +1099,4 @@ app.listen(PORT, async () => {
         console.error('❌ Não foi possível conectar ao banco de dados:', error);
     }
 });
+```
