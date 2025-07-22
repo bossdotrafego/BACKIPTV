@@ -5,10 +5,10 @@ const path = require('path');
 const axios = require('axios');
 const { Sequelize, DataTypes } = require('sequelize');
 
-// === IMPORTAÇÃO DO WHATSAPP ===
-const WhatsAppClient = require('./whatsapp/evolution');
-const createWhatsAppRoutes = require('./whatsapp/routes');
-const MessageTemplates = require('./whatsapp/messages');
+// === IMPORTAÇÃO DO WHATSAPP (CORRIGIDO) ===
+const WhatsAppClient = require('./whatsapp-api/evolution');
+const createWhatsAppRoutes = require('./whatsapp-api/routes');
+const MessageTemplates = require('./whatsapp-api/messages');
 
 // --- CONFIGURAÇÃO DO BANCO DE DADOS ---
 const sequelize = new Sequelize(process.env.DB_NAME, process.env.DB_USER, process.env.DB_PASSWORD, {
