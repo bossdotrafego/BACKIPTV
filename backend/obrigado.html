@@ -3,370 +3,229 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>🎉 Pagamento Aprovado - UniTV</title>
-    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700&display=swap" rel="stylesheet">
+    <title>WhatsApp QR Code - UniTV</title>
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-        
         body {
-            font-family: 'Montserrat', Arial, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            font-family: 'Arial', sans-serif;
+            background: linear-gradient(135deg, #25D366 0%, #128C7E 100%);
             min-height: 100vh;
             display: flex;
             align-items: center;
             justify-content: center;
+            margin: 0;
             padding: 20px;
         }
         
         .container {
             background: white;
             border-radius: 20px;
-            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
             padding: 40px;
-            max-width: 600px;
-            width: 100%;
             text-align: center;
-            animation: slideUp 0.8s ease-out;
-        }
-        
-        @keyframes slideUp {
-            from {
-                opacity: 0;
-                transform: translateY(30px);
-            }
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
-        }
-        
-        .success-icon {
-            width: 80px;
-            height: 80px;
-            background: #28a745;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            margin: 0 auto 20px;
-            animation: bounce 0.6s ease-out;
-        }
-        
-        @keyframes bounce {
-            0%, 20%, 53%, 80%, 100% {
-                animation-timing-function: cubic-bezier(0.215, 0.610, 0.355, 1.000);
-                transform: translate3d(0,0,0);
-            }
-            40%, 43% {
-                animation-timing-function: cubic-bezier(0.755, 0.050, 0.855, 0.060);
-                transform: translate3d(0, -30px, 0);
-            }
-            70% {
-                animation-timing-function: cubic-bezier(0.755, 0.050, 0.855, 0.060);
-                transform: translate3d(0, -15px, 0);
-            }
-            90% {
-                transform: translate3d(0,-4px,0);
-            }
-        }
-        
-        .success-icon::before {
-            content: '✓';
-            color: white;
-            font-size: 40px;
-            font-weight: bold;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            max-width: 500px;
+            width: 100%;
         }
         
         h1 {
-            color: #333;
-            font-size: 2.5rem;
-            margin-bottom: 10px;
-            font-weight: 700;
+            color: #25D366;
+            margin-bottom: 20px;
+            font-size: 2rem;
         }
         
-        .subtitle {
-            color: #666;
-            font-size: 1.2rem;
-            margin-bottom: 30px;
-        }
-        
-        .codigo-container {
+        .qr-container {
             background: #f8f9fa;
-            border: 3px dashed #28a745;
+            border: 2px dashed #25D366;
             border-radius: 15px;
             padding: 30px;
             margin: 30px 0;
-            position: relative;
         }
         
-        .codigo-label {
-            background: white;
-            color: #28a745;
-            font-weight: 600;
-            padding: 5px 15px;
-            border-radius: 20px;
-            position: absolute;
-            top: -12px;
-            left: 50%;
-            transform: translateX(-50%);
-            font-size: 0.9rem;
-        }
-        
-        .codigo-texto {
-            font-family: 'Courier New', monospace;
-            font-size: 1.8rem;
-            font-weight: bold;
-            color: #333;
-            letter-spacing: 2px;
-            margin: 10px 0;
-            word-break: break-all;
-        }
-        
-        .copy-btn {
-            background: #007bff;
-            color: white;
-            border: none;
-            padding: 8px 20px;
-            border-radius: 20px;
-            font-size: 0.9rem;
-            cursor: pointer;
-            transition: all 0.3s;
-        }
-        
-        .copy-btn:hover {
-            background: #0056b3;
-            transform: scale(1.05);
-        }
-        
-        .instrucoes {
-            background: #e8f4fd;
-            border-left: 4px solid #007bff;
-            padding: 20px;
-            border-radius: 8px;
-            margin: 30px 0;
-            text-align: left;
-        }
-        
-        .instrucoes h3 {
-            color: #007bff;
-            margin-bottom: 15px;
-            font-size: 1.3rem;
-        }
-        
-        .instrucoes ol {
-            color: #555;
-            line-height: 1.6;
-            padding-left: 20px;
-        }
-        
-        .instrucoes li {
-            margin-bottom: 8px;
-        }
-        
-        .botoes {
+        #qrcode {
             display: flex;
-            gap: 15px;
             justify-content: center;
-            flex-wrap: wrap;
-            margin-top: 30px;
-        }
-        
-        .btn {
-            padding: 15px 30px;
-            border: none;
-            border-radius: 50px;
-            font-size: 1.1rem;
-            font-weight: 600;
-            text-decoration: none;
-            transition: all 0.3s;
-            display: inline-flex;
-            align-items: center;
-            gap: 10px;
-            min-width: 200px;
-            justify-content: center;
-        }
-        
-        .btn-whatsapp {
-            background: #25D366;
-            color: white;
-        }
-        
-        .btn-whatsapp:hover {
-            background: #20ba5a;
-            transform: translateY(-2px);
-            box-shadow: 0 5px 15px rgba(37, 211, 102, 0.4);
-        }
-        
-        .btn-voltar {
-            background: #6c757d;
-            color: white;
-        }
-        
-        .btn-voltar:hover {
-            background: #545b62;
-            transform: translateY(-2px);
-        }
-        
-        .plano-info {
-            background: linear-gradient(45deg, #4c60c0, #e5343d);
-            color: white;
-            padding: 20px;
-            border-radius: 15px;
             margin: 20px 0;
         }
         
-        .hidden {
-            display: none;
+        .loading {
+            color: #666;
+            font-style: italic;
         }
         
-        @media (max-width: 600px) {
-            .container {
-                padding: 30px 20px;
-            }
-            
-            h1 {
-                font-size: 2rem;
-            }
-            
-            .codigo-texto {
-                font-size: 1.4rem;
-                letter-spacing: 1px;
-            }
-            
-            .botoes {
-                flex-direction: column;
-                align-items: center;
-            }
-            
-            .btn {
-                width: 100%;
-                max-width: 300px;
-            }
+        .instructions {
+            background: #e8f5e8;
+            border-left: 4px solid #25D366;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 20px 0;
+            text-align: left;
+        }
+        
+        .status {
+            padding: 15px;
+            border-radius: 10px;
+            margin: 20px 0;
+            font-weight: bold;
+        }
+        
+        .status.disconnected {
+            background: #fff3cd;
+            color: #856404;
+            border: 1px solid #ffeaa7;
+        }
+        
+        .status.connected {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        
+        .btn {
+            background: #25D366;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 25px;
+            cursor: pointer;
+            font-size: 1rem;
+            margin: 10px;
+            transition: all 0.3s;
+        }
+        
+        .btn:hover {
+            background: #20ba5a;
+            transform: scale(1.05);
+        }
+        
+        .btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
         }
     </style>
+    <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
 </head>
 <body>
     <div class="container">
-        <div class="success-icon"></div>
-        <h1>🎉 INCRÍVEL!</h1>
-        <p class="subtitle">Seu pagamento foi aprovado e seu código UniTV está prontinho!</p>
+        <h1>📱 WhatsApp QR Code</h1>
+        <p>Conecte seu WhatsApp Business ao sistema UniTV</p>
         
-        <div style="background: linear-gradient(45deg, #28a745, #20c997); color: white; padding: 20px; border-radius: 15px; margin: 20px 0;">
-            <h2 style="margin: 0 0 10px 0;">🚀 BEM-VINDO À FAMÍLIA UNITV!</h2>
-            <p style="margin: 0; font-size: 1.1rem;">Você agora faz parte de mais de <strong>50.000 clientes satisfeitos</strong> que escolheram a melhor experiência de streaming do Brasil!</p>
+        <div id="status" class="status disconnected">
+            🔄 Verificando status da conexão...
         </div>
         
-        <div class="plano-info">
-            <h3 id="plano-nome">🎯 Plano Ativado</h3>
-            <p>🙌 Olá, <strong id="cliente-nome">Cliente</strong>! Obrigado por confiar na UniTV!</p>
-            <p style="margin-top: 10px; font-size: 0.95rem;">💎 Você tem acesso ao nosso <strong>SUPORTE VIP VITALÍCIO</strong> - equipe exclusiva sempre disponível!</p>
-        </div>
-        
-        <div class="codigo-container">
-            <div class="codigo-label">🔑 SEU CÓDIGO UNITV EXCLUSIVO</div>
-            <div class="codigo-texto" id="codigo-unitv">3212196222383122</div>
-            <button class="copy-btn" onclick="copiarCodigo()">📋 Copiar Código</button>
-            <p style="margin-top: 15px; color: #666; font-size: 0.9rem;">
-                ⚡ <strong>Ativação instantânea!</strong> Use este código agora mesmo no seu app UniTV
-            </p>
-        </div>
-        
-        <div class="instrucoes">
-            <h3>📱 Como ativar seu código em 30 segundos:</h3>
-            <ol>
-                <li>📲 Abra o app <strong>UniTV</strong> no seu dispositivo</li>
-                <li>👤 Vá em <strong>Perfil</strong> no menu principal</li>
-                <li>🎁 Toque em <strong>Centro de Resgate</strong></li>
-                <li>📝 Cole o código acima e confirme</li>
-                <li>🎉 <strong>PRONTO!</strong> Seu plano foi ativado e você já pode assistir!</li>
-            </ol>
-            <div style="background: #fff3cd; border: 1px solid #ffeaa7; padding: 15px; border-radius: 8px; margin-top: 15px;">
-                <p style="margin: 0; color: #856404; font-weight: 600;">
-                    💡 <strong>DICA ESPECIAL:</strong> Salve este código em local seguro! Ele é seu comprovante de compra e pode ser usado para suporte.
-                </p>
+        <div class="qr-container">
+            <div id="qrcode">
+                <div class="loading">🔄 Carregando QR Code...</div>
             </div>
         </div>
         
-        <div class="botoes">
-            <a href="https://wa.me/554591567288?text=Olá%21+Acabei+de+comprar+meu+plano+UniTV+e+gostaria+de+falar+com+o+SUPORTE+VIP+VITALÍCIO%21+Meu+código%3A+3212196222383122" 
-               class="btn btn-whatsapp" 
-               target="_blank"
-               id="btn-suporte">
-                💎 SUPORTE VIP VITALÍCIO
-            </a>
-            <a href="https://codigounitvexpress.com/" class="btn btn-voltar">
-                🏠 Voltar ao Site
-            </a>
+        <div class="instructions">
+            <h3>📋 Como conectar:</h3>
+            <ol>
+                <li>📱 Abra o <strong>WhatsApp Business</strong> no seu celular</li>
+                <li>⚙️ Vá em <strong>"Dispositivos conectados"</strong></li>
+                <li>🔗 Toque em <strong>"Conectar um dispositivo"</strong></li>
+                <li>📷 <strong>Escaneie o QR Code</strong> acima</li>
+                <li>✅ Aguarde a confirmação de conexão</li>
+            </ol>
         </div>
         
-        <div style="margin-top: 30px; padding: 20px; background: #f8f9fa; border-radius: 15px; text-align: left;">
-            <h4 style="color: #28a745; margin-bottom: 15px;">🌟 O que você ganhou hoje:</h4>
-            <ul style="color: #555; line-height: 1.8; padding-left: 20px;">
-                <li>✅ <strong>Acesso ilimitado</strong> aos melhores canais e conteúdos</li>
-                <li>✅ <strong>Qualidade HD/4K</strong> em todos os dispositivos</li>
-                <li>✅ <strong>Suporte VIP vitalício</strong> - equipe exclusiva 24/7</li>
-                <li>✅ <strong>Atualizações gratuitas</strong> do app e catálogo</li>
-                <li>✅ <strong>Garantia de satisfação</strong> - se não gostar, devolvemos!</li>
-            </ul>
+        <div>
+            <button class="btn" onclick="atualizarQR()">🔄 Atualizar QR Code</button>
+            <button class="btn" onclick="verificarStatus()">📊 Verificar Status</button>
+        </div>
+        
+        <div style="margin-top: 20px; font-size: 0.9rem; color: #666;">
+            <p>⚠️ O QR Code expira em alguns minutos. Se não conseguir conectar, clique em "Atualizar QR Code"</p>
         </div>
     </div>
 
     <script>
-        // Obter dados da URL
-        const urlParams = new URLSearchParams(window.location.search);
-        const idPagamento = urlParams.get('id');
+        let intervalId;
         
-        // Se tiver ID do pagamento, buscar dados específicos
-        if (idPagamento) {
-            buscarDadosPagamento(idPagamento);
-        }
+        // Inicializar
+        window.onload = function() {
+            verificarStatus();
+            atualizarQR();
+            
+            // Verificar status a cada 10 segundos
+            intervalId = setInterval(verificarStatus, 10000);
+        };
         
-        async function buscarDadosPagamento(id) {
+        async function verificarStatus() {
             try {
-                const response = await fetch('/api/verificar-pagamento', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({ id_pagamento: id })
-                });
-                
+                const response = await fetch('/api/whatsapp/status');
                 const data = await response.json();
                 
-                if (data.sucesso && data.status === 'approved' && data.codigo) {
-                    // Atualizar informações na página
-                    document.getElementById('codigo-unitv').textContent = data.codigo;
-                    document.getElementById('cliente-nome').textContent = data.nome;
-                    document.getElementById('plano-nome').textContent = data.plano;
+                const statusDiv = document.getElementById('status');
+                
+                if (data.connected) {
+                    statusDiv.className = 'status connected';
+                    statusDiv.innerHTML = '✅ WhatsApp conectado com sucesso!';
                     
-                    // Atualizar link do WhatsApp com o código
-                    const btnSuporte = document.getElementById('btn-suporte');
-                    const linkBase = 'https://wa.me/554591567288?text=Olá%21+Acabei+de+comprar+meu+plano+UniTV+e+gostaria+de+falar+com+o+SUPORTE+VIP+VITALÍCIO%21+Meu+código%3A+';
-                    btnSuporte.href = linkBase + encodeURIComponent(data.codigo);
+                    // Se conectado, parar de verificar
+                    if (intervalId) {
+                        clearInterval(intervalId);
+                    }
+                    
+                    // Esconder QR Code
+                    document.getElementById('qrcode').innerHTML = '<div style="color: #25D366; font-size: 1.2rem;">🎉 Conexão estabelecida!</div>';
+                } else {
+                    statusDiv.className = 'status disconnected';
+                    statusDiv.innerHTML = '⏳ Aguardando conexão do WhatsApp...';
                 }
+                
+                console.log('Status WhatsApp:', data);
             } catch (error) {
-                console.log('Usando dados padrão da página');
+                console.error('Erro ao verificar status:', error);
+                document.getElementById('status').innerHTML = '❌ Erro ao verificar status';
             }
         }
         
-        function copiarCodigo() {
-            const codigo = document.getElementById('codigo-unitv').textContent;
-            navigator.clipboard.writeText(codigo).then(() => {
-                const btn = document.querySelector('.copy-btn');
-                const textoOriginal = btn.innerHTML;
-                btn.innerHTML = '✅ Copiado!';
-                btn.style.background = '#28a745';
+        async function atualizarQR() {
+            try {
+                document.getElementById('qrcode').innerHTML = '<div class="loading">🔄 Carregando QR Code...</div>';
                 
-                setTimeout(() => {
-                    btn.innerHTML = textoOriginal;
-                    btn.style.background = '#007bff';
-                }, 2000);
-            });
+                const response = await fetch('/api/whatsapp/qr');
+                const data = await response.json();
+                
+                if (data.success && data.qrCode) {
+                    // Gerar QR Code visual usando a biblioteca
+                    const qrContainer = document.getElementById('qrcode');
+                    qrContainer.innerHTML = '';
+                    
+                    QRCode.toCanvas(data.qrCode, { 
+                        width: 256,
+                        margin: 2,
+                        color: {
+                            dark: '#000000',
+                            light: '#FFFFFF'
+                        }
+                    }, function (error, canvas) {
+                        if (error) {
+                            console.error('Erro ao gerar QR Code:', error);
+                            qrContainer.innerHTML = '<div style="color: red;">❌ Erro ao gerar QR Code</div>';
+                        } else {
+                            qrContainer.appendChild(canvas);
+                        }
+                    });
+                } else if (data.message === 'WhatsApp já está conectado') {
+                    document.getElementById('qrcode').innerHTML = '<div style="color: #25D366; font-size: 1.2rem;">✅ WhatsApp já conectado!</div>';
+                } else {
+                    document.getElementById('qrcode').innerHTML = '<div style="color: orange;">⚠️ QR Code não disponível. Tente novamente.</div>';
+                }
+            } catch (error) {
+                console.error('Erro ao buscar QR Code:', error);
+                document.getElementById('qrcode').innerHTML = '<div style="color: red;">❌ Erro ao carregar QR Code</div>';
+            }
         }
+        
+        // Limpar interval quando sair da página
+        window.onbeforeunload = function() {
+            if (intervalId) {
+                clearInterval(intervalId);
+            }
+        };
     </script>
 </body>
 </html>
