@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WhatsApp QR Code - UniTV</title>
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            background: linear-gradient(135deg, #25D366 0%, #128C7E 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0;
+            padding: 20px;
+        }
+        
+        .container {
+            background: white;
+            border-radius: 20px;
+            padding: 40px;
+            text-align: center;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            max-width: 500px;
+            width: 100%;
+        }
+        
+        h1 {
+            color: #25D366;
+            margin-bottom: 20px;
+            font-size: 2rem;
+        }
+        
+        .qr-container {
+            background: #f8f9fa;
+            border: 2px dashed #25D366;
+            border-radius: 15px;
+            padding: 30px;
+            margin: 30px 0;
+        }
+        
+        #qrcode {
+            display: flex;
+            justify-content: center;
+            margin: 20px 0;
+        }
+        
+        .loading {
+            color: #666;
+            font-style: italic;
+        }
+        
+        .instructions {
+            background: #e8f5e8;
+            border-left: 4px solid #25D366;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 20px 0;
+            text-align: left;
+        }
+        
+        .status {
+            padding: 15px;
+            border-radius: 10px;
+            margin: 20px 0;
+            font-weight: bold;
+        }
+        
+        .status.disconnected {
+            background: #fff3cd;
+            color: #856404;
+            border: 1px solid #ffeaa7;
+        }
+        
+        .status.connected {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        
+        .btn {
+            background: #25D366;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 25px;
+            cursor: pointer;
+            font-size: 1rem;
+            margin: 10px;
+            transition: all 0.3s;
+        }
+        
+        .btn:hover {
+            background: #20ba5a;
+            transform: scale(1.05);
+        }
+        
+        .btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+        }
+    </style>
+    <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
+</head>
+<body>
+    <div class="container">
+        <h1>📱 WhatsApp QR Code</h1>
+        <p>Conecte seu WhatsApp Business ao sistema UniTV</p>
+        
+        <div id="status" class="status disconnected">
+            🔄 Verificando status da conexão...
+        </div>
+        
+        <div class="qr-container">
+            <div id="qrcode">
+                <div class="loading">🔄 Carregando QR Code...</div>
+            </div>
+        </div>
+        
+        <div class="instructions">
+            <h3>📋 Como conectar:</h3>
+            <ol>
+                <li>📱 Abra o <strong>WhatsApp Business</strong> no seu celular</li>
+                <li>⚙️ Vá em <strong>"Dispositivos conectados"</strong></li>
+                <li>🔗 Toque em <strong>"Conectar um dispositivo"</strong></li>
+                <li>📷 <strong>Escaneie o QR Code</strong> acima</li>
+                <li>✅ Aguarde a confirmação de conexão</li>
+            </ol>
+        </div>
+        
+        <div>
+            <button class="btn" onclick="atualizarQR()">🔄 Atualizar QR Code</button>
+            <button class="btn" onclick="verificarStatus()">📊 Verificar Status</button>
+        </div>
+        
+        <div style="margin-top: 20px; font-size: 0.9rem; color: #666;">
+            <p>⚠️ O QR Code expira em alguns minutos. Se não conseguir conectar, clique em "Atualizar QR Code"</p>
+        </div>
+    </div>
+
+    <script>
+        let intervalId;
+        
+        // Inicializar
+        window.onload = function() {
+            verificarStatus();
+            atualizarQR();
+            
+            // Verificar status a cada 10 segundos
+            intervalId = setInterval(verificarStatus, 10000);
+        };
+        
+        async function verificarStatus() {
+            try {
+                const response = await fetch('/api/whatsapp/status');
+                const data = await response.json();
+                
+                const statusDiv = document.getElementById('status');
+                
+                if (data.connected) {
+                    statusDiv.className = 'status connected';
+                    statusDiv.innerHTML = '✅ WhatsApp conectado com sucesso!';
+                    
+                    // Se conectado, parar de verificar
+                    if (intervalId) {
+                        clearInterval(intervalId);
+                    }
+                    
+                    // Esconder QR Code
+                    document.getElementById('qrcode').innerHTML = '<div style="color: #25D366; font-size: 1.2rem;">🎉 Conexão estabelecida!</div>';
+                } else {
+                    statusDiv.className = 'status disconnected';
+                    statusDiv.innerHTML = '⏳ Aguardando conexão do WhatsApp...';
+                }
+                
+                console.log('Status WhatsApp:', data);
+            } catch (error) {
+                console.error('Erro ao verificar status:', error);
+                document.getElementById('status').innerHTML = '❌ Erro ao verificar status';
+            }
+        }
+        
+        async function atualizarQR() {
+            try {
+                document.getElementById('qrcode').innerHTML = '<div class="loading">🔄 Carregando QR Code...</div>';
+                
+                const response = await fetch('/api/whatsapp/qr');
+                const data = await response.json();
+                
+                if (data.success && data.qrCode) {
+                    // Gerar QR Code visual usando a biblioteca
+                    const qrContainer = document.getElementById('qrcode');
+                    qrContainer.innerHTML = '';
+                    
+                    QRCode.toCanvas(data.qrCode, { 
+                        width: 256,
+                        margin: 2,
+                        color: {
+                            dark: '#000000',
+                            light: '#FFFFFF'
+                        }
+                    }, function (error, canvas) {
+                        if (error) {
+                            console.error('Erro ao gerar QR Code:', error);
+                            qrContainer.innerHTML = '<div style="color: red;">❌ Erro ao gerar QR Code</div>';
+                        } else {
+                            qrContainer.appendChild(canvas);
+                        }
+                    });
+                } else if (data.message === 'WhatsApp já está conectado') {
+                    document.getElementById('qrcode').innerHTML = '<div style="color: #25D366; font-size: 1.2rem;">✅ WhatsApp já conectado!</div>';
+                } else {
+                    document.getElementById('qrcode').innerHTML = '<div style="color: orange;">⚠️ QR Code não disponível. Tente novamente.</div>';
+                }
+            } catch (error) {
+                console.error('Erro ao buscar QR Code:', error);
+                document.getElementById('qrcode').innerHTML = '<div style="color: red;">❌ Erro ao carregar QR Code</div>';
+            }
+        }
+        
+        // Limpar interval quando sair da página
+        window.onbeforeunload = function() {
+            if (intervalId) {
+                clearInterval(intervalId);
+            }
+        };
+    </script>
+</body>
+</html>
