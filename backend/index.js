@@ -167,6 +167,365 @@ app.use(express.static(__dirname));
 // --- USAR ROTAS DO WHATSAPP ---
 app.use('/api/whatsapp', createWhatsAppRoutes(whatsappClient));
 
+// ===================================================================
+//                    🚀 PÁGINA QR CODE WHATSAPP - NOVA ROTA
+// ===================================================================
+
+// --- ROTA PARA SERVIR A PÁGINA QR CODE DO WHATSAPP ---
+app.get('/whatsapp-qr.html', (req, res) => {
+  const htmlContent = `<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WhatsApp QR Code - UniTV</title>
+    <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        
+        .container {
+            background: white;
+            padding: 40px;
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            text-align: center;
+            max-width: 500px;
+            width: 100%;
+        }
+        
+        .logo {
+            font-size: 2.5em;
+            color: #667eea;
+            margin-bottom: 10px;
+            font-weight: bold;
+        }
+        
+        .subtitle {
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 1.1em;
+        }
+        
+        .qr-container {
+            background: #f8f9fa;
+            padding: 30px;
+            border-radius: 15px;
+            margin: 30px 0;
+            border: 2px dashed #dee2e6;
+        }
+        
+        #qrcode {
+            display: flex;
+            justify-content: center;
+            margin: 20px 0;
+        }
+        
+        .loading {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 15px;
+        }
+        
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #667eea;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .status {
+            margin: 20px 0;
+            padding: 15px;
+            border-radius: 10px;
+            font-weight: bold;
+        }
+        
+        .status.loading {
+            background: #fff3cd;
+            color: #856404;
+            border: 1px solid #ffeaa7;
+        }
+        
+        .status.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        
+        .status.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        
+        .instructions {
+            background: #e3f2fd;
+            padding: 20px;
+            border-radius: 10px;
+            margin: 20px 0;
+            text-align: left;
+        }
+        
+        .instructions h3 {
+            color: #1976d2;
+            margin-bottom: 15px;
+            text-align: center;
+        }
+        
+        .instructions ol {
+            color: #666;
+            line-height: 1.6;
+        }
+        
+        .instructions li {
+            margin: 8px 0;
+        }
+        
+        .refresh-btn {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 12px 30px;
+            border-radius: 25px;
+            font-size: 1em;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin: 10px;
+        }
+        
+        .refresh-btn:hover {
+            background: #5a6fd8;
+            transform: translateY(-2px);
+        }
+        
+        .refresh-btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+        }
+        
+        .connection-status {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 10px 20px;
+            border-radius: 20px;
+            font-weight: bold;
+            font-size: 0.9em;
+        }
+        
+        .connection-status.connected {
+            background: #d4edda;
+            color: #155724;
+        }
+        
+        .connection-status.disconnected {
+            background: #f8d7da;
+            color: #721c24;
+        }
+        
+        @media (max-width: 600px) {
+            .container {
+                margin: 10px;
+                padding: 20px;
+            }
+            
+            .logo {
+                font-size: 2em;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="logo">📱 UniTV</div>
+        <div class="subtitle">Conectar WhatsApp Business</div>
+        
+        <div class="qr-container">
+            <div id="loading" class="loading">
+                <div class="spinner"></div>
+                <p>Carregando QR Code...</p>
+            </div>
+            <div id="qrcode"></div>
+            <div id="status" class="status loading" style="display: none;">
+                Aguardando conexão...
+            </div>
+        </div>
+        
+        <div class="instructions">
+            <h3>📋 Como conectar:</h3>
+            <ol>
+                <li>Abra o <strong>WhatsApp Business</strong> no seu celular</li>
+                <li>Toque em <strong>Menu (⋮)</strong> > <strong>Dispositivos conectados</strong></li>
+                <li>Toque em <strong>Conectar um dispositivo</strong></li>
+                <li>Aponte a câmera para o QR Code acima</li>
+                <li>Aguarde a confirmação de conexão</li>
+            </ol>
+        </div>
+        
+        <button id="refreshBtn" class="refresh-btn" onclick="loadQRCode()">
+            🔄 Atualizar QR Code
+        </button>
+        
+        <button id="checkStatusBtn" class="refresh-btn" onclick="checkConnectionStatus()">
+            📊 Verificar Status
+        </button>
+    </div>
+    
+    <div id="connectionStatus" class="connection-status disconnected">
+        ❌ Desconectado
+    </div>
+
+    <script>
+        let checkInterval;
+        
+        async function loadQRCode() {
+            const loading = document.getElementById('loading');
+            const qrcode = document.getElementById('qrcode');
+            const status = document.getElementById('status');
+            const refreshBtn = document.getElementById('refreshBtn');
+            
+            loading.style.display = 'flex';
+            qrcode.innerHTML = '';
+            status.style.display = 'none';
+            refreshBtn.disabled = true;
+            refreshBtn.textContent = '⏳ Carregando...';
+            
+            try {
+                console.log('Buscando QR Code...');
+                const response = await fetch('/api/whatsapp/qr');
+                const data = await response.json();
+                
+                console.log('Resposta da API:', data);
+                
+                if (data.success && data.qrCode) {
+                    loading.style.display = 'none';
+                    
+                    await QRCode.toCanvas(qrcode, data.qrCode, {
+                        width: 300,
+                        margin: 2,
+                        color: {
+                            dark: '#000000',
+                            light: '#FFFFFF'
+                        }
+                    });
+                    
+                    status.className = 'status loading';
+                    status.textContent = '✅ QR Code gerado! Escaneie com WhatsApp Business';
+                    status.style.display = 'block';
+                    
+                    startStatusCheck();
+                    
+                } else {
+                    throw new Error(data.message || 'Erro ao carregar QR Code');
+                }
+                
+            } catch (error) {
+                console.error('Erro:', error);
+                loading.style.display = 'none';
+                status.className = 'status error';
+                status.textContent = '❌ Erro: ' + error.message;
+                status.style.display = 'block';
+            } finally {
+                refreshBtn.disabled = false;
+                refreshBtn.textContent = '🔄 Atualizar QR Code';
+            }
+        }
+        
+        async function checkConnectionStatus() {
+            try {
+                const response = await fetch('/api/whatsapp/status');
+                const data = await response.json();
+                
+                const connectionStatus = document.getElementById('connectionStatus');
+                const status = document.getElementById('status');
+                
+                if (data.connected) {
+                    connectionStatus.className = 'connection-status connected';
+                    connectionStatus.textContent = '✅ Conectado';
+                    
+                    if (status) {
+                        status.className = 'status success';
+                        status.textContent = '🎉 WhatsApp conectado com sucesso!';
+                        status.style.display = 'block';
+                    }
+                    
+                    if (checkInterval) {
+                        clearInterval(checkInterval);
+                    }
+                } else {
+                    connectionStatus.className = 'connection-status disconnected';
+                    connectionStatus.textContent = '❌ Desconectado';
+                }
+                
+                console.log('Status WhatsApp:', data);
+                
+            } catch (error) {
+                console.error('Erro ao verificar status:', error);
+            }
+        }
+        
+        function startStatusCheck() {
+            if (checkInterval) {
+                clearInterval(checkInterval);
+            }
+            
+            checkInterval = setInterval(checkConnectionStatus, 5000);
+        }
+        
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('Página carregada, iniciando...');
+            loadQRCode();
+            checkConnectionStatus();
+        });
+        
+        window.addEventListener('beforeunload', function() {
+            if (checkInterval) {
+                clearInterval(checkInterval);
+            }
+        });
+    </script>
+</body>
+</html>`;
+
+  res.send(htmlContent);
+});
+
+// --- ROTAS ADICIONAIS PARA FACILITAR O ACESSO ---
+app.get('/whatsapp', (req, res) => {
+  res.redirect('/whatsapp-qr.html');
+});
+
+app.get('/qr', (req, res) => {
+  res.redirect('/whatsapp-qr.html');
+});
+
+// ===================================================================
+//                    FIM DA SEÇÃO QR CODE
+// ===================================================================
+
 // --- CONFIGURAÇÃO DA BUCKPAY ---
 const BUCKPAY_API_BASE = 'https://api.realtechdev.com.br';
 const BUCKPAY_SECRET_TOKEN = process.env.BUCKPAY_SECRET_TOKEN || 'sk_live_a74d213bb8682959c3449ee40c192791';
@@ -666,6 +1025,7 @@ app.listen(PORT, async () => {
     console.log(`   - Status: https://unitv.onrender.com/admin/status`);
     console.log(`📍 Webhook fixo: https://unitv.onrender.com/webhook`);
     console.log(`📱 WhatsApp API: https://unitv.onrender.com/api/whatsapp/status`);
+    console.log(`🔗 WhatsApp QR Code: https://unitv.onrender.com/whatsapp-qr.html`);
     console.log(`💳 Provider de pagamento: BuckPay`);
     
     try {
