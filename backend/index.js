@@ -401,69 +401,57 @@ app.get('/whatsapp-qr.html', (req, res) => {
     <script>
         let checkInterval;
         
-        // ==========================================================
-        //           NOVA FUNÇÃO loadQRCode (VERSÃO FINAL)
-        // ==========================================================
-        async function loadQRCode(retries = 5, delay = 2000) {
+        async function loadQRCode() {
             const loading = document.getElementById('loading');
             const qrcode = document.getElementById('qrcode');
             const status = document.getElementById('status');
             const refreshBtn = document.getElementById('refreshBtn');
-
+            
             loading.style.display = 'flex';
             qrcode.innerHTML = '';
             status.style.display = 'none';
             refreshBtn.disabled = true;
             refreshBtn.textContent = '⏳ Carregando...';
-
-            for (let i = 0; i < retries; i++) {
-                try {
-                    console.log(`Buscando QR Code (Tentativa ${i + 1}/${retries})...`);
-                    const response = await fetch('/api/whatsapp/qr');
-                    const data = await response.json();
-                    console.log('Resposta da API:', data);
-
-                    if (data.success && data.qrCode) {
-                        loading.style.display = 'none';
-                        
-                        await QRCode.toCanvas(qrcode, data.qrCode, {
-                            width: 300,
-                            margin: 2,
-                            color: { dark: '#000000', light: '#FFFFFF' }
-                        });
-
-                        status.className = 'status loading';
-                        status.textContent = '✅ QR Code gerado! Escaneie com WhatsApp Business';
-                        status.style.display = 'block';
-                        
-                        startStatusCheck();
-                        refreshBtn.disabled = false;
-                        refreshBtn.textContent = '🔄 Atualizar QR Code';
-                        return; // Sucesso, sai da função
-                    }
-
-                    // Se chegou aqui, não obteve o QR Code. Espera para a próxima tentativa.
-                    if (i < retries - 1) {
-                        const loadingText = document.querySelector('#loading p');
-                        if (loadingText) loadingText.textContent = `Aguardando o servidor... (${i + 1}/${retries})`;
-                        await new Promise(resolve => setTimeout(resolve, delay));
-                    } else {
-                        // Se for a última tentativa e falhou, lança o erro final.
-                        throw new Error(data.message || 'Não foi possível obter o QR Code após várias tentativas.');
-                    }
-
-                } catch (error) {
-                    console.error('Erro na tentativa ' + (i + 1) + ':', error);
-                    if (i >= retries - 1) {
-                        // Exibe o erro somente após a última tentativa
-                        loading.style.display = 'none';
-                        status.className = 'status error';
-                        status.textContent = '❌ Erro: ' + error.message;
-                        status.style.display = 'block';
-                        refreshBtn.disabled = false;
-                        refreshBtn.textContent = '🔄 Tentar Novamente';
-                    }
+            
+            try {
+                console.log('Buscando QR Code...');
+                const response = await fetch('/api/whatsapp/qr');
+                const data = await response.json();
+                
+                console.log('Resposta da API:', data);
+                
+                if (data.success && data.qrCode) {
+                    loading.style.display = 'none';
+                    
+                    // O objeto QRCode é usado aqui, por isso a biblioteca precisa estar carregada
+                    await QRCode.toCanvas(qrcode, data.qrCode, {
+                        width: 300,
+                        margin: 2,
+                        color: {
+                            dark: '#000000',
+                            light: '#FFFFFF'
+                        }
+                    });
+                    
+                    status.className = 'status loading';
+                    status.textContent = '✅ QR Code gerado! Escaneie com WhatsApp Business';
+                    status.style.display = 'block';
+                    
+                    startStatusCheck();
+                    
+                } else {
+                    throw new Error(data.message || 'Erro ao carregar QR Code');
                 }
+                
+            } catch (error) {
+                console.error('Erro:', error);
+                loading.style.display = 'none';
+                status.className = 'status error';
+                status.textContent = '❌ Erro: ' + error.message;
+                status.style.display = 'block';
+            } finally {
+                refreshBtn.disabled = false;
+                refreshBtn.textContent = '🔄 Atualizar QR Code';
             }
         }
         
@@ -508,6 +496,7 @@ app.get('/whatsapp-qr.html', (req, res) => {
             checkInterval = setInterval(checkConnectionStatus, 5000);
         }
         
+        // =================== CÓDIGO CORRIGIDO ===================
         document.addEventListener('DOMContentLoaded', function() {
             console.log('Página carregada, iniciando verificação da biblioteca...');
 
@@ -527,6 +516,7 @@ app.get('/whatsapp-qr.html', (req, res) => {
             // Inicia a primeira tentativa
             attemptLoad();
         });
+        // ================= FIM DA CORREÇÃO ===================
         
         window.addEventListener('beforeunload', function() {
             if (checkInterval) {
