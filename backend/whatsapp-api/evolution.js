@@ -55,6 +55,11 @@ class WhatsAppClient {
                 if (qr) {
                     console.log('📱 QR Code gerado para WhatsApp');
                     this.qrCode = qr;
+
+                    // =================== LINHA ADICIONADA ===================
+                    console.log('--- TEXTO DO QR CODE (copie tudo abaixo) ---\n' + qr + '\n--- FIM DO TEXTO ---');
+                    // ========================================================
+
                     this.generateQRImage(qr);
                 }
 
