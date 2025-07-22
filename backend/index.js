@@ -401,9 +401,6 @@ app.get('/whatsapp-qr.html', (req, res) => {
     <script>
         let checkInterval;
         
-        // ==========================================================
-        //           NOVA FUNÇÃO loadQRCode (VERSÃO FINAL)
-        // ==========================================================
         async function loadQRCode(retries = 5, delay = 2000) {
             const loading = document.getElementById('loading');
             const qrcode = document.getElementById('qrcode');
@@ -418,7 +415,8 @@ app.get('/whatsapp-qr.html', (req, res) => {
 
             for (let i = 0; i < retries; i++) {
                 try {
-                    console.log(`Buscando QR Code (Tentativa ${i + 1}/${retries})...`);
+                    // CORREÇÃO: Usando aspas simples para o console.log para evitar erro de sintaxe.
+                    console.log('Buscando QR Code (Tentativa ' + (i + 1) + '/' + retries + ')...');
                     const response = await fetch('/api/whatsapp/qr');
                     const data = await response.json();
                     console.log('Resposta da API:', data);
@@ -439,23 +437,21 @@ app.get('/whatsapp-qr.html', (req, res) => {
                         startStatusCheck();
                         refreshBtn.disabled = false;
                         refreshBtn.textContent = '🔄 Atualizar QR Code';
-                        return; // Sucesso, sai da função
+                        return;
                     }
-
-                    // Se chegou aqui, não obteve o QR Code. Espera para a próxima tentativa.
+                    
                     if (i < retries - 1) {
                         const loadingText = document.querySelector('#loading p');
-                        if (loadingText) loadingText.textContent = `Aguardando o servidor... (${i + 1}/${retries})`;
+                        // CORREÇÃO: Usando aspas simples aqui também.
+                        if (loadingText) loadingText.textContent = 'Aguardando o servidor... (' + (i + 1) + '/' + retries + ')';
                         await new Promise(resolve => setTimeout(resolve, delay));
                     } else {
-                        // Se for a última tentativa e falhou, lança o erro final.
                         throw new Error(data.message || 'Não foi possível obter o QR Code após várias tentativas.');
                     }
 
                 } catch (error) {
                     console.error('Erro na tentativa ' + (i + 1) + ':', error);
                     if (i >= retries - 1) {
-                        // Exibe o erro somente após a última tentativa
                         loading.style.display = 'none';
                         status.className = 'status error';
                         status.textContent = '❌ Erro: ' + error.message;
@@ -512,19 +508,16 @@ app.get('/whatsapp-qr.html', (req, res) => {
             console.log('Página carregada, iniciando verificação da biblioteca...');
 
             function attemptLoad() {
-                // Verifica se a biblioteca QRCode já existe no navegador
                 if (typeof QRCode !== 'undefined') {
                     console.log('✅ Biblioteca QRCode pronta. Carregando dados...');
-                    loadQRCode(); // Agora é seguro chamar
+                    loadQRCode();
                     checkConnectionStatus();
                 } else {
-                    // Se não estiver pronta, espera 100ms e tenta de novo
                     console.log('⚠️ Biblioteca QRCode ainda não carregada, tentando novamente em 100ms...');
                     setTimeout(attemptLoad, 100);
                 }
             }
             
-            // Inicia a primeira tentativa
             attemptLoad();
         });
         
