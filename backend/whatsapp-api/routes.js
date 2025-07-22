@@ -1,4 +1,4 @@
-// whatsapp/routes.js
+// whatsapp-api/routes.js
 const express = require('express');
 const router = express.Router();
 const MessageTemplates = require('./messages');
@@ -33,6 +33,41 @@ function createWhatsAppRoutes(whatsappClient) {
             res.json({
                 success: false,
                 message: 'QR Code não disponível'
+            });
+        }
+    });
+
+    // Reconectar WhatsApp
+    router.post('/reconnect', async (req, res) => {
+        try {
+            console.log('🔄 Iniciando reconexão do WhatsApp...');
+            
+            // Desconectar primeiro se estiver conectado
+            await whatsappClient.disconnect();
+            
+            // Aguardar 2 segundos
+            await new Promise(resolve => setTimeout(resolve, 2000));
+            
+            // Tentar reconectar
+            const result = await whatsappClient.initialize();
+            
+            if (result) {
+                res.json({
+                    success: true,
+                    message: 'Reconexão iniciada com sucesso',
+                    timestamp: new Date().toISOString()
+                });
+            } else {
+                res.status(500).json({
+                    success: false,
+                    message: 'Falha ao iniciar reconexão'
+                });
+            }
+        } catch (error) {
+            console.error('❌ Erro na reconexão:', error);
+            res.status(500).json({
+                success: false,
+                error: error.message
             });
         }
     });
@@ -164,20 +199,21 @@ function createWhatsAppRoutes(whatsappClient) {
         }
     });
 
-    // Reconectar WhatsApp
-    router.post('/reconnect', async (req, res) => {
-        try {
-            await whatsappClient.initialize();
-            res.json({
-                success: true,
-                message: 'Tentativa de reconexão iniciada'
-            });
-        } catch (error) {
-            res.status(500).json({
-                success: false,
-                error: error.message
-            });
-        }
+    // Teste de conectividade
+    router.get('/test', (req, res) => {
+        res.json({
+            success: true,
+            message: 'WhatsApp API está funcionando',
+            timestamp: new Date().toISOString(),
+            routes: [
+                'GET /status - Status da conexão',
+                'GET /qr - Obter QR Code',
+                'POST /reconnect - Reconectar WhatsApp',
+                'POST /send - Enviar mensagem manual',
+                'POST /send-codigo - Enviar código',
+                'POST /disconnect - Desconectar'
+            ]
+        });
     });
 
     return router;
