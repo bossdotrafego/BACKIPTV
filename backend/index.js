@@ -423,6 +423,7 @@ app.get('/whatsapp-qr.html', (req, res) => {
                 if (data.success && data.qrCode) {
                     loading.style.display = 'none';
                     
+                    // O objeto QRCode é usado aqui, por isso a biblioteca precisa estar carregada
                     await QRCode.toCanvas(qrcode, data.qrCode, {
                         width: 300,
                         margin: 2,
@@ -495,11 +496,27 @@ app.get('/whatsapp-qr.html', (req, res) => {
             checkInterval = setInterval(checkConnectionStatus, 5000);
         }
         
+        // =================== CÓDIGO CORRIGIDO ===================
         document.addEventListener('DOMContentLoaded', function() {
-            console.log('Página carregada, iniciando...');
-            loadQRCode();
-            checkConnectionStatus();
+            console.log('Página carregada, iniciando verificação da biblioteca...');
+
+            function attemptLoad() {
+                // Verifica se a biblioteca QRCode já existe no navegador
+                if (typeof QRCode !== 'undefined') {
+                    console.log('✅ Biblioteca QRCode pronta. Carregando dados...');
+                    loadQRCode(); // Agora é seguro chamar
+                    checkConnectionStatus();
+                } else {
+                    // Se não estiver pronta, espera 100ms e tenta de novo
+                    console.log('⚠️ Biblioteca QRCode ainda não carregada, tentando novamente em 100ms...');
+                    setTimeout(attemptLoad, 100);
+                }
+            }
+            
+            // Inicia a primeira tentativa
+            attemptLoad();
         });
+        // ================= FIM DA CORREÇÃO ===================
         
         window.addEventListener('beforeunload', function() {
             if (checkInterval) {
